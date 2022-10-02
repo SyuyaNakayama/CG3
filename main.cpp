@@ -13,7 +13,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int)
 
 	// ゲームウィンドウの作成
 	win = WinApp::GetInstance();
-	win->CreateGameWindow("LE2C_17_ナカヤマ_シュウヤ_AL4");
+	win->CreateGameWindow("LE2C_17_ナカヤマ_シュウヤ_CG3");
 		
 	// DirectX初期化処理
 	dxCommon = DirectXCommon::GetInstance();
@@ -39,7 +39,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int)
 	while (true)
 	{
 		// メッセージ処理
-		if (win->ProcessMessage()) {	break; }
+		if (win->ProcessMessage()) { break; }
 
 		// 入力関連の毎フレーム処理
 		input->Update();
