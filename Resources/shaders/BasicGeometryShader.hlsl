@@ -1,27 +1,19 @@
 #include "BasicShaderHeader.hlsli"
 
-[maxvertexcount(6)]
+[maxvertexcount(3)]
 void main(
-	triangle VSOutput input[3] : SV_POSITION,
+	point VSOutput input[1] : SV_POSITION,
 	inout TriangleStream< GSOutput > output
 )
 {
 	GSOutput element;
-	for (uint i = 0; i < 3; i++)
-	{
-		element.svpos = input[i].svpos;
-		element.normal = input[i].normal;
-		element.uv = input[i].uv;
-		output.Append(element);
-	}
+	element.normal = input[0].normal;
+	element.uv = input[0].uv;
 
-	output.RestartStrip();
-
-	for (uint i = 0; i < 3; i++)
-	{
-		element.svpos = input[i].svpos + float4(20.0f, 0, 0, 0);
-		element.normal = input[i].normal;
-		element.uv = input[i].uv * 5.0f;
-		output.Append(element);
-	}
+	element.svpos = input[0].svpos;
+	output.Append(element);
+	element.svpos = input[0].svpos + float4(10.0f, 10.0f, 0, 0);
+	output.Append(element);
+	element.svpos = input[0].svpos + float4(10.0f, 0, 0, 0);
+	output.Append(element);
 }
