@@ -25,6 +25,8 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE Object3d::cpuDescHandleSRV;
 CD3DX12_GPU_DESCRIPTOR_HANDLE Object3d::gpuDescHandleSRV;
 XMMATRIX Object3d::matView{};
 XMMATRIX Object3d::matProjection{};
+XMMATRIX Object3d::matBillboard = XMMatrixIdentity();
+XMMATRIX Object3d::matBillboardY = XMMatrixIdentity();
 XMFLOAT3 Object3d::eye = { 0, 0, -50.0f };
 XMFLOAT3 Object3d::target = { 0, 0, 0 };
 XMFLOAT3 Object3d::up = { 0, 1, 0 };
@@ -506,6 +508,7 @@ void Object3d::UpdateViewMatrix()
 	matCameraRot.r[3] = XMVectorSet(0, 0, 0, 1);
 
 	matView = XMMatrixTranspose(matCameraRot);
+	matBillboard = matCameraRot;
 
 	XMVECTOR reverseEyePosition = XMVectorNegate(eyePosition);
 	XMVECTOR tX = XMVector3Dot(cameraAxisX, reverseEyePosition),
@@ -514,6 +517,15 @@ void Object3d::UpdateViewMatrix()
 		translation = XMVectorSet(tX.m128_f32[0], tY.m128_f32[1], tZ.m128_f32[2], 1.0f);
 
 	matView.r[3] = translation;
+
+	XMVECTOR ybillCameraAxisX = cameraAxisX,
+		ybillCameraAxisY = XMVector3Normalize(upVector),
+		ybillCameraAxisZ = XMVector3Cross(ybillCameraAxisX, ybillCameraAxisY);
+
+	matBillboardY.r[0] = ybillCameraAxisX;
+	matBillboardY.r[1] = ybillCameraAxisY;
+	matBillboardY.r[2] = ybillCameraAxisZ;
+	matBillboardY.r[3] = XMVectorSet(0, 0, 0, 1);
 }
 
 bool Object3d::Initialize()
@@ -556,6 +568,7 @@ void Object3d::Update()
 	matWorld = XMMatrixIdentity(); // 変形をリセット
 	matWorld *= matScale; // ワールド行列にスケーリングを反映
 	matWorld *= matRot; // ワールド行列に回転を反映
+	matWorld *= matBillboardY;
 	matWorld *= matTrans; // ワールド行列に平行移動を反映
 
 	// 親オブジェクトがあれば

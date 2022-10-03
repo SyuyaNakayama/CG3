@@ -133,6 +133,10 @@ private: // 静的メンバ変数
 	static XMMATRIX matView;
 	// 射影行列
 	static XMMATRIX matProjection;
+	// ビルボード行列
+	static XMMATRIX matBillboard;
+	// Y軸回りビルボード行列
+	static XMMATRIX matBillboardY;
 	// 視点座標
 	static XMFLOAT3 eye;
 	// 注視点座標
