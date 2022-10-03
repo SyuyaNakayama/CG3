@@ -16,6 +16,12 @@
     <Filter Include="シェーダー ファイル">
       <UniqueIdentifier>{7d0e7b81-4308-414a-ae59-352b3afeccd0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="シェーダー ファイル\Sprite">
+      <UniqueIdentifier>{e6e54e5d-7299-411f-85d7-23162d41c2b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="シェーダー ファイル\Basic">
+      <UniqueIdentifier>{5deddea1-a3d4-4ef2-a912-196b31c1542c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -44,28 +50,28 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Resources\shaders\BasicGeometryShader.hlsl">
+      <Filter>シェーダー ファイル\Basic</Filter>
+    </FxCompile>
     <FxCompile Include="Resources\shaders\BasicPixelShader.hlsl">
-      <Filter>シェーダー ファイル</Filter>
+      <Filter>シェーダー ファイル\Basic</Filter>
     </FxCompile>
     <FxCompile Include="Resources\shaders\BasicVertexShader.hlsl">
-      <Filter>シェーダー ファイル</Filter>
+      <Filter>シェーダー ファイル\Basic</Filter>
     </FxCompile>
     <FxCompile Include="Resources\shaders\SpritePixelShader.hlsl">
-      <Filter>シェーダー ファイル</Filter>
+      <Filter>シェーダー ファイル\Sprite</Filter>
     </FxCompile>
     <FxCompile Include="Resources\shaders\SpriteVertexShader.hlsl">
-      <Filter>シェーダー ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="Resources\shaders\BasicGeometryShader.hlsl">
-      <Filter>シェーダー ファイル</Filter>
+      <Filter>シェーダー ファイル\Sprite</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\BasicShaderHeader.hlsli">
-      <Filter>シェーダー ファイル</Filter>
+      <Filter>シェーダー ファイル\Basic</Filter>
     </None>
     <None Include="Resources\shaders\SpriteShaderHeader.hlsli">
-      <Filter>シェーダー ファイル</Filter>
+      <Filter>シェーダー ファイル\Sprite</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
