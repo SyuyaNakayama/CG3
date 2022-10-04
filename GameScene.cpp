@@ -33,12 +33,12 @@ void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
 
 	// 背景スプライト生成
 	spriteBG = Sprite::Create(1, { 0.0f,0.0f });
-	sprite[0] = Sprite::Create(2, {});
-	sprite[1] = Sprite::Create(2, { 500,500 }, { 1,0,0,1 }, {}, false, true);
 
 	// 3Dオブジェクト生成
 	particleMan = ParticleManager::Create();
 	particleMan->Update();
+
+	
 }
 
 void GameScene::Update()
@@ -52,11 +52,30 @@ void GameScene::Update()
 		else if (input->PushKey(DIK_A)) { ParticleManager::CameraMoveEyeVector({ -1.0f,0.0f,0.0f }); }
 	}
 
-	if (input->PushKey(DIK_SPACE))
+	for (int i = 0; i < 5; i++)
 	{
-		XMFLOAT2 position = sprite[0]->GetPosition();
-		position.x += 1.0f;
-		sprite[0]->SetPosition(position);
+		// -5.0f~+5.0f:xyz
+		const float md_pos = 10.0f;
+		XMFLOAT3 pos =
+		{
+			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f,
+			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f,
+			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f
+		};
+		// -0.05f~+0.05f:xyz
+		const float md_vel = 0.1f;
+		XMFLOAT3 vel =
+		{
+			(float)rand() / RAND_MAX * md_vel - md_vel / 2.0f,
+			(float)rand() / RAND_MAX * md_vel - md_vel / 2.0f,
+			(float)rand() / RAND_MAX * md_vel - md_vel / 2.0f
+		};
+		// -0.001f~0:y
+		XMFLOAT3 acc{};
+		const float md_acc = 0.001f;
+		acc.y = -(float)rand() / RAND_MAX * md_acc;
+
+		particleMan->Add(60, pos, vel, acc);
 	}
 
 	particleMan->Update();

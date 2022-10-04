@@ -212,7 +212,7 @@ ComPtr<ID3DBlob> LoadShader(LPCWCHAR fileName, LPCSTR shaderModelName, ComPtr<ID
 void ParticleManager::InitializeGraphicsPipeline()
 {
 	HRESULT result = S_FALSE;
-	ComPtr<ID3DBlob> vsBlob; // 頂点シェーダオブジェクト
+	ComPtr<ID3DBlob> vsBlob;	// 頂点シェーダオブジェクト
 	ComPtr<ID3DBlob> gsBlob;	// ジオメトリシェーダオブジェクト
 	ComPtr<ID3DBlob> psBlob;	// ピクセルシェーダオブジェクト
 	ComPtr<ID3DBlob> errorBlob; // エラーオブジェクト
@@ -251,19 +251,24 @@ void ParticleManager::InitializeGraphicsPipeline()
 	gpipeline.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 
 	// レンダーターゲットのブレンド設定
-	D3D12_RENDER_TARGET_BLEND_DESC blenddesc{};
-	blenddesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;	// RBGA全てのチャンネルを描画
-	blenddesc.BlendEnable = true;
-	blenddesc.BlendOp = D3D12_BLEND_OP_ADD;
-	blenddesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	blenddesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-
-	blenddesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	blenddesc.SrcBlendAlpha = D3D12_BLEND_ONE;
-	blenddesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	D3D12_RENDER_TARGET_BLEND_DESC blenddesc[2]{};
+	for (size_t i = 0; i < 2; i++)
+	{
+		blenddesc[i].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;	// RBGA全てのチャンネルを描画
+		blenddesc[i].BlendEnable = true;
+		blenddesc[i].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		blenddesc[i].SrcBlendAlpha = D3D12_BLEND_ONE;
+		blenddesc[i].DestBlendAlpha = D3D12_BLEND_ZERO;
+		blenddesc[i].SrcBlend = D3D12_BLEND_ONE;
+		blenddesc[i].DestBlend = D3D12_BLEND_ONE;
+	}
+	// 光パーティクル
+	blenddesc[0].BlendOp = D3D12_BLEND_OP_ADD;
+	// 闇パーティクル
+	blenddesc[1].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
 
 	// ブレンドステートの設定
-	gpipeline.BlendState.RenderTarget[0] = blenddesc;
+	gpipeline.BlendState.RenderTarget[0] = blenddesc[0];
 
 	// 深度バッファのフォーマット
 	gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
@@ -274,7 +279,7 @@ void ParticleManager::InitializeGraphicsPipeline()
 
 	// 図形の形状設定（三角形）
 	gpipeline.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
-
+	gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	gpipeline.NumRenderTargets = 1;	// 描画対象は1つ
 	gpipeline.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // 0～255指定のRGBA
 	gpipeline.SampleDesc.Count = 1; // 1ピクセルにつき1回サンプリング
@@ -284,7 +289,7 @@ void ParticleManager::InitializeGraphicsPipeline()
 	descRangeSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0 レジスタ
 
 	// ルートパラメータ
-	CD3DX12_ROOT_PARAMETER rootparams[2];
+	CD3DX12_ROOT_PARAMETER rootparams[2]{};
 	rootparams[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
 	rootparams[1].InitAsDescriptorTable(1, &descRangeSRV, D3D12_SHADER_VISIBILITY_ALL);
 
@@ -318,7 +323,7 @@ void ParticleManager::LoadTexture()
 	ScratchImage scratchImg{};
 
 	// WICテクスチャのロード
-	result = LoadFromWICFile(L"Resources/texture.png", WIC_FLAGS_NONE, &metadata, scratchImg);
+	result = LoadFromWICFile(L"Resources/Particle.png", WIC_FLAGS_NONE, &metadata, scratchImg);
 	assert(SUCCEEDED(result));
 
 	ScratchImage mipChain{};
@@ -386,17 +391,6 @@ void ParticleManager::CreateModel()
 {
 	HRESULT result = S_FALSE;
 
-	for (int i = 0; i < vertexCount; i++)
-	{
-		const float md_width = 10.0f;
-		vertices[i].pos =
-		{
-			(float)rand() / RAND_MAX * md_width - md_width / 2.0f,
-			(float)rand() / RAND_MAX * md_width - md_width / 2.0f,
-			(float)rand() / RAND_MAX * md_width - md_width / 2.0f
-		};
-	}
-
 	UINT sizeVB = static_cast<UINT>(sizeof(vertices));
 
 	// ヒーププロパティ
@@ -447,7 +441,7 @@ void ParticleManager::UpdateViewMatrix()
 	XMVECTOR cameraAxisY = XMVector3Cross(cameraAxisZ, cameraAxisX);
 	cameraAxisY = XMVector3Normalize(cameraAxisY);
 
-	XMMATRIX matCameraRot;
+	XMMATRIX matCameraRot{};
 	matCameraRot.r[0] = cameraAxisX;
 	matCameraRot.r[1] = cameraAxisY;
 	matCameraRot.r[2] = cameraAxisZ;
@@ -497,13 +491,47 @@ bool ParticleManager::Initialize()
 	return true;
 }
 
+const XMFLOAT3 operator+(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
+{
+	XMFLOAT3 result =
+	{
+		lhs.x + rhs.x,
+		lhs.y + rhs.y,
+		lhs.z + rhs.z
+	};
+	return result;
+}
+
 void ParticleManager::Update()
 {
 	HRESULT result;
-	XMMATRIX matScale, matRot, matTrans;
+	XMMATRIX matScale;
 
-	// スケール、回転、平行移動行列の計算
+	// スケール移動行列の計算
 	matScale = XMMatrixScaling(scale.x, scale.y, scale.z);
+
+	particles.remove_if([](Particle& x) { return x.frame >= x.num_frame; });
+
+	for (std::forward_list<Particle>::iterator it = particles.begin();
+		it != particles.end(); it++)
+	{
+		it->frame++;
+		it->velocity += it->accel;
+		it->position += it->velocity;
+	}
+
+	// 定数バッファへデータ転送
+	VertexPos* vertMap = nullptr;
+	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
+	if (SUCCEEDED(result))
+	{
+		for (std::forward_list<Particle>::iterator it = particles.begin();
+			it != particles.end(); it++)
+		{
+			vertMap++->pos = it->position;
+		}
+	}
+	vertBuff->Unmap(0, nullptr);
 
 	// 定数バッファへデータ転送
 	ConstBufferData* constMap = nullptr;
@@ -531,5 +559,16 @@ void ParticleManager::Draw()
 	// シェーダリソースビューをセット
 	cmdList->SetGraphicsRootDescriptorTable(1, gpuDescHandleSRV);
 	// 描画コマンド
-	cmdList->DrawInstanced(_countof(vertices), 1, 0, 0);
+	cmdList->DrawInstanced((UINT)std::distance(particles.begin(), particles.end()), 1, 0, 0);
+}
+
+void ParticleManager::Add(int life, XMFLOAT3 position, XMFLOAT3 velocity, XMFLOAT3 accel)
+{
+	if (std::distance(particles.begin(), particles.end()) >= vertexCount) { return; }
+	particles.emplace_front();
+	Particle& p = particles.front();
+	p.position = position;
+	p.velocity = velocity;
+	p.accel = accel;
+	p.num_frame = life;
 }
