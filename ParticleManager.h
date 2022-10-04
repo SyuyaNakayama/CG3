@@ -151,8 +151,6 @@ private: // 静的メンバ変数
 	static XMFLOAT3 up;
 	// 頂点バッファビュー
 	static D3D12_VERTEX_BUFFER_VIEW vbView;
-	// 頂点データ配列
-	static VertexPos vertices[vertexCount];
 
 private:// 静的メンバ関数
 	/// <summary>

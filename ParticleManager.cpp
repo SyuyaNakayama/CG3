@@ -30,7 +30,6 @@ XMFLOAT3 ParticleManager::eye = { 0, 0, -5.0f };
 XMFLOAT3 ParticleManager::target = { 0, 0, 0 };
 XMFLOAT3 ParticleManager::up = { 0, 1, 0 };
 D3D12_VERTEX_BUFFER_VIEW ParticleManager::vbView{};
-ParticleManager::VertexPos ParticleManager::vertices[vertexCount];
 
 void ParticleManager::StaticInitialize(ID3D12Device* device, int window_width, int window_height)
 {
@@ -391,12 +390,10 @@ void ParticleManager::CreateModel()
 {
 	HRESULT result = S_FALSE;
 
-	UINT sizeVB = static_cast<UINT>(sizeof(vertices));
-
 	// ヒーププロパティ
 	CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 	// リソース設定
-	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeVB);
+	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexCount);
 
 	// 頂点バッファ生成
 	result = device->CreateCommittedResource(
@@ -408,14 +405,13 @@ void ParticleManager::CreateModel()
 	VertexPos* vertMap = nullptr;
 	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 	if (SUCCEEDED(result)) {
-		memcpy(vertMap, vertices, sizeof(vertices));
 		vertBuff->Unmap(0, nullptr);
 	}
 
 	// 頂点バッファビューの作成
 	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
-	vbView.SizeInBytes = sizeof(vertices);
-	vbView.StrideInBytes = sizeof(vertices[0]);
+	vbView.SizeInBytes = vertexCount;
+	vbView.StrideInBytes = sizeof(VertexPos);
 }
 
 void ParticleManager::UpdateViewMatrix()
