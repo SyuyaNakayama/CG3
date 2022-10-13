@@ -38,7 +38,8 @@ void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
 	particleMan = ParticleManager::Create();
 	particleMan->Update();
 
-	
+	// -5.0f~+5.0f:xyz
+
 }
 
 void GameScene::Update()
@@ -52,9 +53,8 @@ void GameScene::Update()
 		else if (input->PushKey(DIK_A)) { ParticleManager::CameraMoveEyeVector({ -1.0f,0.0f,0.0f }); }
 	}
 
-	for (int i = 0; i < 5; i++)
+	for (size_t i = 0; i < 1; i++)
 	{
-		// -5.0f~+5.0f:xyz
 		const float md_pos = 10.0f;
 		XMFLOAT3 pos =
 		{
@@ -75,10 +75,10 @@ void GameScene::Update()
 		const float md_acc = 0.001f;
 		acc.y = -(float)rand() / RAND_MAX * md_acc;
 
-		particleMan->Add(60, pos, vel, acc);
+		particleMan->Add(60, pos, vel, acc, 1.0f, 0.0f);
 	}
-
 	particleMan->Update();
+	debugText.Print(std::to_string(particleMan->GetParticleNum()), 0, 0, 1);
 }
 
 void GameScene::Draw()

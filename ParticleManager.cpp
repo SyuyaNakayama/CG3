@@ -1,7 +1,9 @@
 ﻿#include "ParticleManager.h"
 #include <d3dcompiler.h>
 #include <DirectXTex.h>
-#include<stdio.h>
+#include <stdio.h>
+#include "DebugText.h"
+
 #pragma comment(lib, "d3dcompiler.lib")
 
 using namespace DirectX;
@@ -229,6 +231,11 @@ void ParticleManager::InitializeGraphicsPipeline()
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
 		{ // xy座標(1行で書いたほうが見やすい)
 			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
+		{ // スケール
+			"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 			D3D12_APPEND_ALIGNED_ELEMENT,
 			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
@@ -501,10 +508,6 @@ const XMFLOAT3 operator+(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
 void ParticleManager::Update()
 {
 	HRESULT result;
-	XMMATRIX matScale;
-
-	// スケール移動行列の計算
-	matScale = XMMatrixScaling(scale.x, scale.y, scale.z);
 
 	particles.remove_if([](Particle& x) { return x.frame >= x.num_frame; });
 
@@ -514,6 +517,9 @@ void ParticleManager::Update()
 		it->frame++;
 		it->velocity += it->accel;
 		it->position += it->velocity;
+		float f = (float)it->num_frame / it->frame;
+		it->scale = (it->e_scale - it->s_scale) / f;
+		it->scale += it->s_scale;
 	}
 
 	// 定数バッファへデータ転送
@@ -524,7 +530,9 @@ void ParticleManager::Update()
 		for (std::forward_list<Particle>::iterator it = particles.begin();
 			it != particles.end(); it++)
 		{
-			vertMap++->pos = it->position;
+			vertMap->pos = it->position;
+			vertMap->scale = it->scale;
+			vertMap++;
 		}
 	}
 	vertBuff->Unmap(0, nullptr);
@@ -558,7 +566,7 @@ void ParticleManager::Draw()
 	cmdList->DrawInstanced((UINT)std::distance(particles.begin(), particles.end()), 1, 0, 0);
 }
 
-void ParticleManager::Add(int life, XMFLOAT3 position, XMFLOAT3 velocity, XMFLOAT3 accel)
+void ParticleManager::Add(int life, XMFLOAT3 position, XMFLOAT3 velocity, XMFLOAT3 accel, float start_scale, float end_scale)
 {
 	if (std::distance(particles.begin(), particles.end()) >= vertexCount) { return; }
 	particles.emplace_front();
@@ -567,4 +575,6 @@ void ParticleManager::Add(int life, XMFLOAT3 position, XMFLOAT3 velocity, XMFLOA
 	p.velocity = velocity;
 	p.accel = accel;
 	p.num_frame = life;
+	p.scale = p.s_scale = start_scale;
+	p.e_scale = end_scale;
 }

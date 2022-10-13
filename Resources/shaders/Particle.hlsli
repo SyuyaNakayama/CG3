@@ -8,6 +8,7 @@ cbuffer cbuff0 : register(b0)
 struct VSOutput
 {
 	float4 pos : POSITION; // 頂点座標
+	float scale : TEXCOORD; // スケール
 };
 
 // ジオメトリシェーダーからピクセルシェーダーへのやり取りに使用する構造体
