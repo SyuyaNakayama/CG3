@@ -1,6 +1,7 @@
 ﻿#include "Object3d.h"
 #include <d3dcompiler.h>
 #include <DirectXTex.h>
+#include "Input.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -551,7 +552,7 @@ bool Object3d::Initialize()
 	return true;
 }
 
-void Object3d::Update()
+void Object3d::Update(int flag)
 {
 	HRESULT result;
 	XMMATRIX matScale, matRot, matTrans;
@@ -568,7 +569,8 @@ void Object3d::Update()
 	matWorld = XMMatrixIdentity(); // 変形をリセット
 	matWorld *= matScale; // ワールド行列にスケーリングを反映
 	matWorld *= matRot; // ワールド行列に回転を反映
-	matWorld *= matBillboardY;
+	if (flag == 1) { matWorld *= matBillboard; }
+	if (flag == 2) { matWorld *= matBillboardY; }
 	matWorld *= matTrans; // ワールド行列に平行移動を反映
 
 	// 親オブジェクトがあれば

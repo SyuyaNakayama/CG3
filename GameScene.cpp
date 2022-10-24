@@ -38,7 +38,6 @@ void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
 
 	// 3Dオブジェクト生成
 	object3d = Object3d::Create();
-	object3d->Update();
 }
 
 void GameScene::Update()
@@ -75,7 +74,10 @@ void GameScene::Update()
 		sprite[0]->SetPosition(position);
 	}
 
-	object3d->Update();
+	int flag = 0;
+	if (input->PushKey(DIK_1)) { flag = 1; }
+	if (input->PushKey(DIK_2)) { flag = 2; }
+	object3d->Update(flag);
 }
 
 void GameScene::Draw()
