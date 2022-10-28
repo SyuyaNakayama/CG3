@@ -3,14 +3,12 @@
 
 using namespace DirectX;
 
-GameScene::GameScene()
-{
-}
-
 GameScene::~GameScene()
 {
 	delete spriteBG;
 	delete particleMan;
+	delete modelSphere;
+	delete objShere;
 }
 
 void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
@@ -38,47 +36,17 @@ void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
 	particleMan = ParticleManager::Create();
 	particleMan->Update();
 
-	// -5.0f~+5.0f:xyz
-
+	modelSphere->Initialize();
+	modelSphere->Create("sphere");
+	objShere = Object3d::Create();
+	objShere->SetModel(modelSphere);
+	objShere->SetPosition({ 0,0,0 });
 }
 
 void GameScene::Update()
 {
-	// カメラ移動
-	if (input->PushKey(DIK_W) || input->PushKey(DIK_S) || input->PushKey(DIK_D) || input->PushKey(DIK_A))
-	{
-		if (input->PushKey(DIK_W)) { ParticleManager::CameraMoveEyeVector({ 0.0f,+1.0f,0.0f }); }
-		else if (input->PushKey(DIK_S)) { ParticleManager::CameraMoveEyeVector({ 0.0f,-1.0f,0.0f }); }
-		if (input->PushKey(DIK_D)) { ParticleManager::CameraMoveEyeVector({ +1.0f,0.0f,0.0f }); }
-		else if (input->PushKey(DIK_A)) { ParticleManager::CameraMoveEyeVector({ -1.0f,0.0f,0.0f }); }
-	}
 
-	for (size_t i = 0; i < 1; i++)
-	{
-		const float md_pos = 10.0f;
-		XMFLOAT3 pos =
-		{
-			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f,
-			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f,
-			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f
-		};
-		// -0.05f~+0.05f:xyz
-		const float md_vel = 0.1f;
-		XMFLOAT3 vel =
-		{
-			(float)rand() / RAND_MAX * md_vel - md_vel / 2.0f,
-			(float)rand() / RAND_MAX * md_vel - md_vel / 2.0f,
-			(float)rand() / RAND_MAX * md_vel - md_vel / 2.0f
-		};
-		// -0.001f~0:y
-		XMFLOAT3 acc{};
-		const float md_acc = 0.001f;
-		acc.y = -(float)rand() / RAND_MAX * md_acc;
-
-		particleMan->Add(60, pos, vel, acc, 1.0f, 0.0f);
-	}
-	particleMan->Update();
-	debugText.Print(std::to_string(particleMan->GetParticleNum()), 0, 0, 1);
+	objShere->Update();
 }
 
 void GameScene::Draw()
@@ -104,17 +72,17 @@ void GameScene::Draw()
 
 #pragma region 3Dオブジェクト描画
 	// 3Dオブジェクト描画前処理
-	ParticleManager::PreDraw(cmdList);
+	Model::PreDraw(cmdList);
 
 	// 3Dオブクジェクトの描画
-	particleMan->Draw();
+	objShere->Draw();
 
 	/// <summary>
 	/// ここに3Dオブジェクトの描画処理を追加できる
 	/// </summary>
 
 	// 3Dオブジェクト描画後処理
-	ParticleManager::PostDraw();
+	Model::PostDraw();
 #pragma endregion
 
 #pragma region 前景スプライト描画

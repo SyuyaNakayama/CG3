@@ -6,6 +6,8 @@
 #include "Sprite.h"
 #include "ParticleManager.h"
 #include "DebugText.h"
+#include "Model.h"
+#include "Object3d.h"
 
 /// <summary>
 /// ゲームシーン
@@ -25,12 +27,6 @@ private: // 静的メンバ変数
 	static const int debugTextTexNumber = 0;
 
 public: // メンバ関数
-
-	/// <summary>
-	/// コンストクラタ
-	/// </summary>
-	GameScene();
-
 	/// <summary>
 	/// デストラクタ
 	/// </summary>
@@ -61,5 +57,7 @@ private: // メンバ変数
 	/// </summary>
 	Sprite* spriteBG = nullptr;
 	ParticleManager* particleMan = nullptr;
+	Model* modelSphere = nullptr;
+	Object3d* objShere = nullptr;
 };
 

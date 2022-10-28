@@ -13,7 +13,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int)
 
 	// ゲームウィンドウの作成
 	win = WinApp::GetInstance();
-	win->CreateGameWindow("LE2C_17_ナカヤマ_シュウヤ_CG3");
+	win->CreateGameWindow("LE2C_18_ナカヤマ_シュウヤ_CG3");
 		
 	// DirectX初期化処理
 	dxCommon = DirectXCommon::GetInstance();
@@ -29,6 +29,9 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int)
 	
 	// 3Dオブジェクト静的初期化
 	ParticleManager::StaticInitialize(dxCommon->GetDevice(), WinApp::kWindowWidth, WinApp::kWindowHeight);
+
+	Model::StaticInitialize(dxCommon->GetDevice());
+	Object3d::StaticInitialize(dxCommon->GetDevice(), WinApp::kWindowWidth, WinApp::kWindowHeight);
 #pragma endregion
 
 	// ゲームシーンの初期化
