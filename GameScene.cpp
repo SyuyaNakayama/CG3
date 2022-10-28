@@ -3,10 +3,6 @@
 
 using namespace DirectX;
 
-GameScene::GameScene()
-{
-}
-
 GameScene::~GameScene()
 {
 	delete spriteBG;
@@ -38,8 +34,9 @@ void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
 	particleMan = ParticleManager::Create();
 	particleMan->Update();
 
-	// -5.0f~+5.0f:xyz
-
+	object.push_back({});
+	object[0] = Object3d::Create();
+	object[0]->Update();
 }
 
 void GameScene::Update()
@@ -47,14 +44,15 @@ void GameScene::Update()
 	// カメラ移動
 	if (input->PushKey(DIK_W) || input->PushKey(DIK_S) || input->PushKey(DIK_D) || input->PushKey(DIK_A))
 	{
-		if (input->PushKey(DIK_W)) { ParticleManager::CameraMoveEyeVector({ 0.0f,+1.0f,0.0f }); }
-		else if (input->PushKey(DIK_S)) { ParticleManager::CameraMoveEyeVector({ 0.0f,-1.0f,0.0f }); }
-		if (input->PushKey(DIK_D)) { ParticleManager::CameraMoveEyeVector({ +1.0f,0.0f,0.0f }); }
-		else if (input->PushKey(DIK_A)) { ParticleManager::CameraMoveEyeVector({ -1.0f,0.0f,0.0f }); }
+		Object3d::CameraMoveEyeVector({
+			(float)(input->PushKey(DIK_D) - input->PushKey(DIK_A)) * 0.8f,
+			(float)(input->PushKey(DIK_W) - input->PushKey(DIK_S)) * 0.8f,
+			0.0f });
 	}
 
 	for (size_t i = 0; i < 1; i++)
 	{
+		// -5.0f~+5.0f:xyz
 		const float md_pos = 10.0f;
 		XMFLOAT3 pos =
 		{
@@ -77,8 +75,8 @@ void GameScene::Update()
 
 		particleMan->Add(60, pos, vel, acc, 1.0f, 0.0f);
 	}
+	object[0]->Update();
 	particleMan->Update();
-	debugText.Print(std::to_string(particleMan->GetParticleNum()), 0, 0, 1);
 }
 
 void GameScene::Draw()
@@ -103,18 +101,15 @@ void GameScene::Draw()
 #pragma endregion
 
 #pragma region 3Dオブジェクト描画
-	// 3Dオブジェクト描画前処理
+	// パーティクル描画処理
 	ParticleManager::PreDraw(cmdList);
-
-	// 3Dオブクジェクトの描画
 	particleMan->Draw();
-
-	/// <summary>
-	/// ここに3Dオブジェクトの描画処理を追加できる
-	/// </summary>
-
-	// 3Dオブジェクト描画後処理
 	ParticleManager::PostDraw();
+
+	// 3Dオブジェクト描画処理
+	Object3d::PreDraw(cmdList);
+	object[0]->Draw();
+	Object3d::PostDraw();
 #pragma endregion
 
 #pragma region 前景スプライト描画
