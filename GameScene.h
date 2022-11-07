@@ -23,9 +23,9 @@ private: // エイリアス
 	using XMFLOAT4 = DirectX::XMFLOAT4;
 	using XMMATRIX = DirectX::XMMATRIX;
 
-private: // 静的メンバ変数
 	static const int debugTextTexNumber = 0;
 
+	enum Scene { Billboard, Grass, Particle };
 public: // メンバ関数
 	/// <summary>
 	/// デストラクタ
@@ -50,12 +50,13 @@ public: // メンバ関数
 private: // メンバ変数
 	DirectXCommon* dxCommon = nullptr;
 	Input* input = nullptr;
-	DebugText debugText;	
+	DebugText debugText;
 
 	/// <summary>
 	/// ゲームシーン用
 	/// </summary>
+	Scene scene = Billboard;
 	Sprite* spriteBG = nullptr;
-	std::vector<Object3d*> object;
+	std::vector<Object3d*> object, objectGrass;
 	ParticleManager* particleMan = nullptr;
 };

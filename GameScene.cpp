@@ -34,9 +34,21 @@ void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
 	particleMan = ParticleManager::Create();
 	particleMan->Update();
 
-	object.push_back({});
+	object.resize(2);
 	object[0] = Object3d::Create();
-	object[0]->Update();
+	object[1] = Object3d::Create();
+	object[1]->SetPosition({ -2.0f,0,0 });
+
+	objectGrass.resize(15);
+	for (size_t i = 0; i < objectGrass.size(); i++)
+	{
+		objectGrass[i] = Object3d::Create();
+
+		const float md_pos = 4.0f;
+		objectGrass[i]->SetPosition({
+			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f, 0,
+			(float)rand() / RAND_MAX * md_pos - md_pos / 2.0f });
+	}
 }
 
 void GameScene::Update()
@@ -44,14 +56,29 @@ void GameScene::Update()
 	// カメラ移動
 	if (input->PushKey(DIK_W) || input->PushKey(DIK_S) || input->PushKey(DIK_D) || input->PushKey(DIK_A))
 	{
-		Object3d::CameraMoveEyeVector({
+		XMFLOAT3 move = {
 			(float)(input->PushKey(DIK_D) - input->PushKey(DIK_A)) * 0.8f,
 			(float)(input->PushKey(DIK_W) - input->PushKey(DIK_S)) * 0.8f,
-			0.0f });
+			0.0f };
+
+		Object3d::CameraMoveEyeVector(move);
+		ParticleManager::CameraMoveEyeVector(move);
 	}
 
-	for (size_t i = 0; i < 1; i++)
+	if (input->TriggerKey(DIK_1)) { scene = Billboard; }
+	if (input->TriggerKey(DIK_2)) { scene = Grass; }
+	if (input->TriggerKey(DIK_3)) { scene = Particle; }
+
+	switch (scene)
 	{
+	case GameScene::Billboard:
+		object[0]->Update(1);
+		object[1]->Update(0);
+		break;
+	case GameScene::Grass:
+		for (Object3d* obj : objectGrass) { obj->Update(2); }
+		break;
+	case GameScene::Particle:
 		// -5.0f~+5.0f:xyz
 		const float md_pos = 10.0f;
 		XMFLOAT3 pos =
@@ -74,9 +101,9 @@ void GameScene::Update()
 		acc.y = -(float)rand() / RAND_MAX * md_acc;
 
 		particleMan->Add(60, pos, vel, acc, 1.0f, 0.0f);
+		particleMan->Update();
+		break;
 	}
-	object[0]->Update();
-	particleMan->Update();
 }
 
 void GameScene::Draw()
@@ -101,15 +128,28 @@ void GameScene::Draw()
 #pragma endregion
 
 #pragma region 3Dオブジェクト描画
-	// パーティクル描画処理
-	ParticleManager::PreDraw(cmdList);
-	particleMan->Draw();
-	ParticleManager::PostDraw();
+	switch (scene)
+	{
+	case GameScene::Billboard:
+		// 3Dオブジェクト描画処理
+		Object3d::PreDraw(cmdList);
+		object[0]->Draw();
+		object[1]->Draw();
+		Object3d::PostDraw();
+		break;
+	case GameScene::Grass:
+		Object3d::PreDraw(cmdList);
+		for (Object3d* obj : objectGrass) { obj->Draw(); }
+		Object3d::PostDraw();
+		break;
+	case GameScene::Particle:
+		// パーティクル描画処理
+		ParticleManager::PreDraw(cmdList);
+		particleMan->Draw();
+		ParticleManager::PostDraw();
+		break;
+	}
 
-	// 3Dオブジェクト描画処理
-	Object3d::PreDraw(cmdList);
-	object[0]->Draw();
-	Object3d::PostDraw();
 #pragma endregion
 
 #pragma region 前景スプライト描画

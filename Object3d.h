@@ -181,7 +181,7 @@ public: // メンバ関数
 	/// <summary>
 	/// 毎フレーム処理
 	/// </summary>
-	void Update();
+	void Update(int useBillboard);
 
 	/// <summary>
 	/// 描画

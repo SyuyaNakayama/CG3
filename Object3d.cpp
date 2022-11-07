@@ -318,7 +318,7 @@ void Object3d::LoadTexture()
 	ScratchImage scratchImg{};
 
 	// WICテクスチャのロード
-	result = LoadFromWICFile(L"Resources/texture.png", WIC_FLAGS_NONE, &metadata, scratchImg);
+	result = LoadFromWICFile(L"Resources/Grass.png", WIC_FLAGS_NONE, &metadata, scratchImg);
 	assert(SUCCEEDED(result));
 
 	ScratchImage mipChain{};
@@ -493,7 +493,7 @@ bool Object3d::Initialize()
 	return true;
 }
 
-void Object3d::Update()
+void Object3d::Update(int useBillboard)
 {
 	HRESULT result;
 	XMMATRIX matScale, matRot, matTrans;
@@ -510,7 +510,8 @@ void Object3d::Update()
 	matWorld = XMMatrixIdentity(); // 変形をリセット
 	matWorld *= matScale; // ワールド行列にスケーリングを反映
 	matWorld *= matRot; // ワールド行列に回転を反映
-	matWorld *= matBillboardY;
+	if (useBillboard == 1) { matWorld *= matBillboard; }
+	if (useBillboard == 2) { matWorld *= matBillboardY; }
 	matWorld *= matTrans; // ワールド行列に平行移動を反映
 
 	// 親オブジェクトがあれば
@@ -522,7 +523,7 @@ void Object3d::Update()
 	// 定数バッファへデータ転送
 	ConstBufferData* constMap = nullptr;
 	result = constBuff->Map(0, nullptr, (void**)&constMap);
-	constMap->mat = matView * matProjection;	// 行列の合成
+	constMap->mat = matWorld * matView * matProjection;	// 行列の合成
 	constBuff->Unmap(0, nullptr);
 }
 
