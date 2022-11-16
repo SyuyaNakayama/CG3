@@ -100,7 +100,7 @@ void GameScene::Update()
 		const float md_acc = 0.001f;
 		acc.y = -(float)rand() / RAND_MAX * md_acc;
 
-		particleMan->Add(60, pos, {0,-0.1f,0}, {0,-0.01f,0}, 1.0f, 0.0f);
+		particleMan->Add(60, pos, vel, acc, 1.0f, 0.0f);
 		particleMan->Update();
 		break;
 	}
