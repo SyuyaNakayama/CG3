@@ -235,7 +235,12 @@ void ParticleManager::InitializeGraphicsPipeline()
 			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
 		{ // スケール
-			"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+			"TEXCOORD", 0, DXGI_FORMAT_R32_FLOAT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
+		{ // 色
+			"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 			D3D12_APPEND_ALIGNED_ELEMENT,
 			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
@@ -520,6 +525,9 @@ void ParticleManager::Update()
 		float f = (float)it->num_frame / it->frame;
 		it->scale = (it->e_scale - it->s_scale) / f;
 		it->scale += it->s_scale;
+		float oneFrame = 2.0f / (float)it->num_frame;
+		it->color.x -= oneFrame;
+		it->color.z += oneFrame;
 	}
 
 	// 定数バッファへデータ転送
@@ -532,6 +540,7 @@ void ParticleManager::Update()
 		{
 			vertMap->pos = it->position;
 			vertMap->scale = it->scale;
+			vertMap->color = it->color;
 			vertMap++;
 		}
 	}

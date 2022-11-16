@@ -22,6 +22,9 @@
     <Filter Include="シェーダー ファイル\Particle">
       <UniqueIdentifier>{5deddea1-a3d4-4ef2-a912-196b31c1542c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="シェーダー ファイル\Rain">
+      <UniqueIdentifier>{295c7198-c4bb-45de-a495-912211875ff5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -77,6 +80,15 @@
     <FxCompile Include="Resources\shaders\BasicVertexShader.hlsl">
       <Filter>シェーダー ファイル</Filter>
     </FxCompile>
+    <FxCompile Include="Resources\shaders\RainGS.hlsl">
+      <Filter>シェーダー ファイル\Rain</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\RainPS.hlsl">
+      <Filter>シェーダー ファイル\Rain</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\RainVS.hlsl">
+      <Filter>シェーダー ファイル\Rain</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\Particle.hlsli">
@@ -87,6 +99,9 @@
     </None>
     <None Include="Resources\shaders\BasicShaderHeader.hlsli">
       <Filter>シェーダー ファイル</Filter>
+    </None>
+    <None Include="Resources\shaders\Rain.hlsli">
+      <Filter>シェーダー ファイル\Rain</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

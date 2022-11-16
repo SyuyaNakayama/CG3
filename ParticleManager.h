@@ -27,6 +27,7 @@ public: // サブクラス
 	{
 		XMFLOAT3 pos; // xyz座標
 		float scale; // スケール
+		XMFLOAT3 color;
 	};
 
 	// 定数バッファ用データ構造体
@@ -42,6 +43,7 @@ public: // サブクラス
 		XMFLOAT3 position{}; // 座標
 		XMFLOAT3 velocity{}; // 速度
 		XMFLOAT3 accel{}; // 加速度
+		XMFLOAT3 color = { 1.0f,0,0 }; // 加速度
 		int frame = 0; // 現在フレーム
 		int	num_frame = 0; // 終了フレーム
 		float scale = 1.0f, // スケール
