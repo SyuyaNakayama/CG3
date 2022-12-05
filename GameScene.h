@@ -70,4 +70,6 @@ private: // メンバ変数
 	Object3d* objGround = nullptr;
 	Object3d* objFighter = nullptr;
 	Object3d* objSphere = nullptr;
+
+	Light* light = nullptr;
 };

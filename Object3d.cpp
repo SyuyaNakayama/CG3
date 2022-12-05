@@ -18,6 +18,7 @@ ID3D12Device* Object3d::device = nullptr;
 ID3D12GraphicsCommandList* Object3d::sCommandList = nullptr;
 Object3d::PipelineSet Object3d::pipelineSet;
 Camera* Object3d::sCamera_ = nullptr;
+Light* Object3d::light = nullptr;
 
 void Object3d::StaticInitialize(ID3D12Device* device, Camera* camera) {
 	// nullptrチェック
@@ -140,10 +141,11 @@ void Object3d::CreateGraphicsPipeline() {
 	descRangeSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0 レジスタ
 
 	// ルートパラメータ
-	CD3DX12_ROOT_PARAMETER rootparams[3];
+	CD3DX12_ROOT_PARAMETER rootparams[4]{};
 	rootparams[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
 	rootparams[1].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL);
 	rootparams[2].InitAsDescriptorTable(1, &descRangeSRV, D3D12_SHADER_VISIBILITY_ALL);
+	rootparams[3].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_ALL);
 
 	// スタティックサンプラー
 	CD3DX12_STATIC_SAMPLER_DESC samplerDesc = CD3DX12_STATIC_SAMPLER_DESC(0);
@@ -258,16 +260,19 @@ void Object3d::Update() {
 		matWorld *= matTrans; // ワールド行列に平行移動を反映
 	}
 
-	const XMMATRIX& matViewProjection = sCamera_->GetViewProjectionMatrix();
-
 	// 親オブジェクトがあれば
 	if (parent != nullptr) {
 		// 親オブジェクトのワールド行列を掛ける
 		matWorld *= parent->matWorld;
 	}
 
+	const XMMATRIX& matViewProjection = sCamera_->GetViewProjectionMatrix();
+	const XMFLOAT3& cameraPos = sCamera_->GetEye();
+
 	// 定数バッファへデータ転送
-	constMap->mat = matWorld * matViewProjection; // 行列の合成
+	constMap->viewproj = matViewProjection;
+	constMap->world = matWorld;
+	constMap->cameraPos = cameraPos;
 }
 
 void Object3d::Draw() {
@@ -286,7 +291,8 @@ void Object3d::Draw() {
 	sCommandList->SetGraphicsRootSignature(pipelineSet.rootsignature.Get());
 	// 定数バッファビューをセット
 	sCommandList->SetGraphicsRootConstantBufferView(0, constBuffB0->GetGPUVirtualAddress());
-
+	// ライトの描画
+	light->Draw(sCommandList,3);
 	// モデル描画
 	model->Draw(sCommandList);
 }

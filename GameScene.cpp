@@ -17,6 +17,7 @@ GameScene::~GameScene()
 	delete modelFighter;
 	delete camera;
 	delete modelSphere;
+	delete light;
 }
 
 void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
@@ -69,16 +70,37 @@ void GameScene::Initialize(DirectXCommon* dxCommon, Input* input)
 
 	objFighter->SetPosition({ 1,0,0 });
 	objSphere->SetPosition({ -1,1,0 });
+
+	light = Light::Create();
+	light->SetLightColor({ 1,1,1 });
+	Object3d::SetLight(light);
 }
 
 void GameScene::Update()
 {
 	camera->Update();
 
+	XMFLOAT3 rot = objSphere->GetRotation();
+	rot.y += 1.0f;
+	objSphere->SetRotation(rot);
+	
+	static XMVECTOR lightDir = { 0,1,5,0 };
+
+	if (input->PushKey(DIK_D)) { lightDir.m128_f32[0] += 1.0f; }
+	if (input->PushKey(DIK_A)) { lightDir.m128_f32[0] -= 1.0f; }
+	if (input->PushKey(DIK_W)) { lightDir.m128_f32[1] += 1.0f; }
+	if (input->PushKey(DIK_S)) { lightDir.m128_f32[1] -= 1.0f; }
+
+	light->SetLightDir(lightDir);
+
+	//std::ostringstream 
+
 	objSkydome->Update();
 	objGround->Update();
 	objFighter->Update();
 	objSphere->Update();
+
+	light->Update();
 
 	debugText.Print("AD: move camera LeftRight", 50, 50, 1.0f);
 	debugText.Print("WS: move camera UpDown", 50, 70, 1.0f);
