@@ -7,21 +7,23 @@
 #include <d3dx12.h>
 #include <vector>
 #include <wrl.h>
+#include <unordered_map>
 
 /// <summary>
 /// 形状データ
 /// </summary>
 class Mesh {
-  private: // エイリアス
+private: // エイリアス
 	// Microsoft::WRL::を省略
 	template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 	// DirectX::を省略
 	using XMFLOAT2 = DirectX::XMFLOAT2;
 	using XMFLOAT3 = DirectX::XMFLOAT3;
 	using XMFLOAT4 = DirectX::XMFLOAT4;
+	using XMVECTOR = DirectX::XMVECTOR;
 	using XMMATRIX = DirectX::XMMATRIX;
 
-  public: // サブクラス
+public: // サブクラス
 	// 頂点データ構造体（テクスチャあり）
 	struct VertexPosNormalUv {
 		XMFLOAT3 pos;    // xyz座標
@@ -29,18 +31,18 @@ class Mesh {
 		XMFLOAT2 uv;     // uv座標
 	};
 
-  public: // 静的メンバ関数
+public: // 静的メンバ関数
 	/// <summary>
 	/// 静的初期化
 	/// </summary>
 	/// <param name="device">デバイス</param>
 	static void StaticInitialize(ID3D12Device* device);
 
-  private: // 静的メンバ変数
+private: // 静的メンバ変数
 	// デバイス
 	static ID3D12Device* device;
 
-  public: // メンバ関数
+public: // メンバ関数
 	/// <summary>
 	/// 名前を取得
 	/// </summary>
@@ -51,19 +53,19 @@ class Mesh {
 	/// 名前をセット
 	/// </summary>
 	/// <param name="name">名前</param>
-	void SetName(const std::string& name);
+	void SetName(const std::string& name) { this->name = name; }
 
 	/// <summary>
 	/// 頂点データの追加
 	/// </summary>
 	/// <param name="vertex">頂点データ</param>
-	void AddVertex(const VertexPosNormalUv& vertex);
+	void AddVertex(const VertexPosNormalUv& vertex) { vertices.emplace_back(vertex); }
 
 	/// <summary>
 	/// 頂点インデックスの追加
 	/// </summary>
 	/// <param name="index">インデックス</param>
-	void AddIndex(unsigned short index);
+	void AddIndex(unsigned short index) { indices.emplace_back(index); }
 
 	/// <summary>
 	/// マテリアルの取得
@@ -75,7 +77,7 @@ class Mesh {
 	/// マテリアルの割り当て
 	/// </summary>
 	/// <param name="material">マテリアル</param>
-	void SetMaterial(Material* material);
+	void SetMaterial(Material* material) { this->material = material; }
 
 	/// <summary>
 	/// バッファの生成
@@ -100,7 +102,13 @@ class Mesh {
 	/// <param name="cmdList">命令発行先コマンドリスト</param>
 	void Draw(ID3D12GraphicsCommandList* cmdList);
 
-  private: // メンバ変数
+	size_t GetVertexCount() { return vertices.size(); }
+
+	void AddSmoothData(UINT16 indexPosition, UINT16 indexVertex) { smoothData[indexPosition].emplace_back(indexVertex); }
+
+	void CalculateSmoothedVertexNormals();
+
+private: // メンバ変数
 	// 名前
 	std::string name;
 	// 頂点バッファ
@@ -121,4 +129,6 @@ class Mesh {
 	VertexPosNormalUv* vertMap = nullptr;
 	// インデックスバッファのマップ
 	unsigned short* indexMap = nullptr;
+	// 頂点座標スムージング用データ
+	std::unordered_map<UINT16, std::vector<UINT16>> smoothData;
 };

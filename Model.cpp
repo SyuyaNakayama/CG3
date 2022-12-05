@@ -19,10 +19,10 @@ void Model::StaticInitialize(ID3D12Device* device) {
 	Mesh::StaticInitialize(device);
 }
 
-Model* Model::CreateFromOBJ(const std::string& modelname) {
+Model* Model::CreateFromOBJ(const std::string& modelname, bool smoothing) {
 	// メモリ確保
 	Model* instance = new Model;
-	instance->Initialize(modelname);
+	instance->Initialize(modelname, smoothing);
 
 	return instance;
 }
@@ -39,7 +39,7 @@ Model::~Model() {
 	materials.clear();
 }
 
-void Model::Initialize(const std::string& modelname) {
+void Model::Initialize(const std::string& modelname, bool smoothing = false) {
 	const string filename = modelname + ".obj";
 	const string directoryPath = baseDirectory + modelname + "/";
 
@@ -81,6 +81,8 @@ void Model::Initialize(const std::string& modelname) {
 		}
 		// 先頭文字列がgならグループの開始
 		if (key == "g") {
+			// 頂点法線の平均によるエッジの平滑化
+			if (smoothing) { mesh->CalculateSmoothedVertexNormals(); }
 
 			if (mesh->GetName().size() > 0) {
 				// コンテナに登録
@@ -166,6 +168,12 @@ void Model::Initialize(const std::string& modelname) {
 					vertex.normal = normals[indexNormal - 1];
 					vertex.uv = texcoords[indexTexcoord - 1];
 					mesh->AddVertex(vertex);
+					// エッジ平滑化用のデータを追加
+					if (smoothing)
+					{
+						// vキー(座標データ)の番号と、全て合成した頂点のインデックスをセットで登録する
+						mesh->AddSmoothData(indexPosition, (UINT16)mesh->GetVertexCount() - 1);
+					}
 				} else {
 					char c;
 					index_stream >> c;
@@ -177,6 +185,12 @@ void Model::Initialize(const std::string& modelname) {
 						vertex.normal = {0, 0, 1};
 						vertex.uv = {0, 0};
 						mesh->AddVertex(vertex);
+						// エッジ平滑化用のデータを追加
+						if (smoothing)
+						{
+							// vキー(座標データ)の番号と、全て合成した頂点のインデックスをセットで登録する
+							mesh->AddSmoothData(indexPosition, (UINT16)mesh->GetVertexCount() - 1);
+						}
 					} else {
 						index_stream.seekg(-1, ios_base::cur); // 1文字戻る
 						index_stream >> indexTexcoord;
@@ -188,6 +202,12 @@ void Model::Initialize(const std::string& modelname) {
 						vertex.normal = normals[indexNormal - 1];
 						vertex.uv = {0, 0};
 						mesh->AddVertex(vertex);
+						// エッジ平滑化用のデータを追加
+						if (smoothing)
+						{
+							// vキー(座標データ)の番号と、全て合成した頂点のインデックスをセットで登録する
+							mesh->AddSmoothData(indexPosition, (UINT16)mesh->GetVertexCount() - 1);
+						}
 					}
 				}
 				// インデックスデータの追加
@@ -206,6 +226,9 @@ void Model::Initialize(const std::string& modelname) {
 		}
 	}
 	file.close();
+
+	// 頂点法線の平均によるエッジの平滑化
+	if (smoothing) { mesh->CalculateSmoothedVertexNormals(); }
 
 	// コンテナに登録
 	meshes.emplace_back(mesh);

@@ -12,7 +12,7 @@
 /// ゲームシーン
 /// </summary>
 class GameScene {
-  private: // エイリアス
+private: // エイリアス
 	// Microsoft::WRL::を省略
 	template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 	// DirectX::を省略
@@ -21,14 +21,14 @@ class GameScene {
 	using XMFLOAT4 = DirectX::XMFLOAT4;
 	using XMMATRIX = DirectX::XMMATRIX;
 
-  private: // 静的メンバ変数
+private: // 静的メンバ変数
 	static const int debugTextTexNumber = 0;
 
-  public: // メンバ関数
+public: // メンバ関数
 	/// <summary>
 	/// コンストクラタ
 	/// </summary>
-	GameScene();
+	GameScene() {}
 
 	/// <summary>
 	/// デストラクタ
@@ -50,7 +50,7 @@ class GameScene {
 	/// </summary>
 	void Draw();
 
-  private: // メンバ変数
+private: // メンバ変数
 	DirectXCommon* dxCommon = nullptr;
 	Input* input = nullptr;
 	DebugText debugText;
