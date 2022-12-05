@@ -93,18 +93,12 @@ void GameScene::Update()
 
 	light->SetLightDir(lightDir);
 
-	//std::ostringstream 
-
 	objSkydome->Update();
 	objGround->Update();
 	objFighter->Update();
 	objSphere->Update();
 
 	light->Update();
-
-	debugText.Print("AD: move camera LeftRight", 50, 50, 1.0f);
-	debugText.Print("WS: move camera UpDown", 50, 70, 1.0f);
-	debugText.Print("ARROW: move camera FrontBack", 50, 90, 1.0f);
 }
 
 void GameScene::Draw()
