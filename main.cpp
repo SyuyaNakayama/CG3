@@ -13,7 +13,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int)
 
 	// ゲームウィンドウの作成
 	win = WinApp::GetInstance();
-	win->CreateGameWindow("LE2C_18_ナカヤマ_シュウヤ_CG3");
+	win->CreateGameWindow();
 		
 	// DirectX初期化処理
 	dxCommon = DirectXCommon::GetInstance();
@@ -28,10 +28,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int)
 	Sprite::StaticInitialize(dxCommon->GetDevice(), WinApp::kWindowWidth, WinApp::kWindowHeight);
 	
 	// 3Dオブジェクト静的初期化
-	ParticleManager::StaticInitialize(dxCommon->GetDevice(), WinApp::kWindowWidth, WinApp::kWindowHeight);
-
-	Model::StaticInitialize(dxCommon->GetDevice());
-	Object3d::StaticInitialize(dxCommon->GetDevice(), WinApp::kWindowWidth, WinApp::kWindowHeight);
+	Object3d::StaticInitialize(dxCommon->GetDevice());
 #pragma endregion
 
 	// ゲームシーンの初期化
@@ -42,7 +39,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int)
 	while (true)
 	{
 		// メッセージ処理
-		if (win->ProcessMessage()) { break; }
+		if (win->ProcessMessage()) {	break; }
 
 		// 入力関連の毎フレーム処理
 		input->Update();

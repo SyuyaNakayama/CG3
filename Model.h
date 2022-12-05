@@ -1,128 +1,94 @@
-#pragma once
-#include <Windows.h>
-#include <wrl.h>
-#include <d3d12.h>
-#include <DirectXMath.h>
-#include <d3dx12.h>
+ï»¿#pragma once
+
+#include "Mesh.h"
+#include <string>
+#include <unordered_map>
 #include <vector>
 
-using namespace std;
-
-class Model
-{
-private:
-	// Microsoft::WRL::‚ğÈ—ª
-	template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
-	// DirectX::‚ğÈ—ª
+/// <summary>
+/// ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿
+/// </summary>
+class Model {
+  private: // ã‚¨ã‚¤ãƒªã‚¢ã‚¹
+	// Microsoft::WRL::ã‚’çœç•¥
+	template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+	// DirectX::ã‚’çœç•¥
 	using XMFLOAT2 = DirectX::XMFLOAT2;
 	using XMFLOAT3 = DirectX::XMFLOAT3;
+	using XMFLOAT4 = DirectX::XMFLOAT4;
+	using XMMATRIX = DirectX::XMMATRIX;
 
-public:
-	// ’¸“_ƒf[ƒ^\‘¢‘Ì
-	struct VertexPosNormalUv
-	{
-		XMFLOAT3 pos; // xyzÀ•W
-		XMFLOAT3 normal; // –@üƒxƒNƒgƒ‹
-		XMFLOAT2 uv;  // uvÀ•W
-	};
+  private:
+	static const std::string baseDirectory;
 
-	// ƒ}ƒeƒŠƒAƒ‹
-	struct Material
-	{
-		string name;
-		XMFLOAT3 ambient;
-		XMFLOAT3 diffuse;
-		XMFLOAT3 specular;
-		float alpha;
-		string textureFilename;
-
-		Material()
-		{
-			ambient = { 0.3f,0.3f,0.3f };
-			diffuse = {};
-			specular = {};
-			alpha = 1.0f;
-		}
-	};
-
-private:
-	// ƒfƒoƒCƒX
+  private: // é™çš„ãƒ¡ãƒ³ãƒå¤‰æ•°
+	// ãƒ‡ãƒã‚¤ã‚¹
 	static ID3D12Device* device;
-	// ƒRƒ}ƒ“ƒhƒŠƒXƒg
-	static ID3D12GraphicsCommandList* cmdList;
-	// ’¸“_ƒoƒbƒtƒ@
-	static ComPtr<ID3D12Resource> vertBuff;
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@
-	static ComPtr<ID3D12Resource> indexBuff;
-	// ’¸“_ƒoƒbƒtƒ@ƒrƒ…[
-	static D3D12_VERTEX_BUFFER_VIEW vbView;
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@ƒrƒ…[
-	static D3D12_INDEX_BUFFER_VIEW ibView;
-	// ƒeƒNƒXƒ`ƒƒƒoƒbƒtƒ@
-	static ComPtr<ID3D12Resource> texbuff;
-	// ’¸“_ƒf[ƒ^”z—ñ
-	static vector<VertexPosNormalUv> vertices;
-	// ’¸“_ƒCƒ“ƒfƒbƒNƒX”z—ñ
-	static vector<unsigned short> indices;
-	// ƒ}ƒeƒŠƒAƒ‹
-	static Material material;
-	// ƒVƒF[ƒ_ƒŠƒ\[ƒXƒrƒ…[‚Ìƒnƒ“ƒhƒ‹(CPU)
-	static CD3DX12_CPU_DESCRIPTOR_HANDLE cpuDescHandleSRV;
-	// ƒVƒF[ƒ_ƒŠƒ\[ƒXƒrƒ…[‚Ìƒnƒ“ƒhƒ‹(CPU)
-	static CD3DX12_GPU_DESCRIPTOR_HANDLE gpuDescHandleSRV;
-	// ƒfƒXƒNƒŠƒvƒ^ƒq[ƒv
-	static ComPtr<ID3D12DescriptorHeap> descHeap;
-	// ƒfƒXƒNƒŠƒvƒ^ƒTƒCƒY
+	// ãƒ‡ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã‚µã‚¤ã‚º
 	static UINT descriptorHandleIncrementSize;
-	// ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg
-	static ComPtr<ID3D12PipelineState> pipelinestate;
-	// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ
-	static ComPtr<ID3D12RootSignature> rootsignature;
 
-public:
+  public: // é™çš„ãƒ¡ãƒ³ãƒé–¢æ•°
+	/// <summary>
+	/// é™çš„åˆæœŸåŒ–
+	/// </summary>
+	/// <param name="device">ãƒ‡ãƒã‚¤ã‚¹</param>
 	static void StaticInitialize(ID3D12Device* device);
-	/// <summary>
-	/// •`‰æ‘Oˆ—
-	/// </summary>
-	/// <param name="cmdList">•`‰æƒRƒ}ƒ“ƒhƒŠƒXƒg</param>
-	static void PreDraw(ID3D12GraphicsCommandList* cmdList);
 
 	/// <summary>
-	/// •`‰æŒãˆ—
+	/// OBJãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆ
 	/// </summary>
-	static void PostDraw();
-	
+	/// <param name="modelname">ãƒ¢ãƒ‡ãƒ«å</param>
+	/// <returns>ç”Ÿæˆã•ã‚ŒãŸãƒ¢ãƒ‡ãƒ«</returns>
+	static Model* CreateFromOBJ(const std::string& modelname);
+
+  public: // ãƒ¡ãƒ³ãƒé–¢æ•°
 	/// <summary>
-	/// ƒfƒXƒNƒŠƒvƒ^ƒq[ƒv‚Ì‰Šú‰»
+	/// ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 	/// </summary>
-	static void InitializeDescriptorHeap();
+	~Model();
 
 	/// <summary>
-	/// ƒOƒ‰ƒtƒBƒbƒNƒpƒCƒvƒ‰ƒCƒ“¶¬
+	/// åˆæœŸåŒ–
 	/// </summary>
-	/// <returns>¬”Û</returns>
-	static void InitializeGraphicsPipeline();
+	/// <param name="modelname">ãƒ¢ãƒ‡ãƒ«å</param>
+	void Initialize(const std::string& modelname);
 
 	/// <summary>
-	/// ƒeƒNƒXƒ`ƒƒ“Ç‚İ‚İ
+	/// æç”»
 	/// </summary>
-	static void LoadTexture(const string& DIRECTORY_PATH, const string& FILENAME);
+	/// <param name="cmdList">å‘½ä»¤ç™ºè¡Œå…ˆã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆ</param>
+	void Draw(ID3D12GraphicsCommandList* cmdList);
+
+  private: // ãƒ¡ãƒ³ãƒå¤‰æ•°
+	// åå‰
+	std::string name;
+	// ãƒ¡ãƒƒã‚·ãƒ¥ã‚³ãƒ³ãƒ†ãƒŠ
+	std::vector<Mesh*> meshes;
+	// ãƒãƒ†ãƒªã‚¢ãƒ«ã‚³ãƒ³ãƒ†ãƒŠ
+	std::unordered_map<std::string, Material*> materials;
+	// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆãƒãƒ†ãƒªã‚¢ãƒ«
+	Material* defaultMaterial = nullptr;
+	// ãƒ‡ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—
+	ComPtr<ID3D12DescriptorHeap> descHeap;
+
+  private: // ãƒ¡ãƒ³ãƒé–¢æ•°
+	/// <summary>
+	/// ãƒãƒ†ãƒªã‚¢ãƒ«èª­ã¿è¾¼ã¿
+	/// </summary>
+	void LoadMaterial(const std::string& directoryPath, const std::string& filename);
 
 	/// <summary>
-	/// ƒ}ƒeƒŠƒAƒ‹“Ç‚İ‚İ
+	/// ãƒãƒ†ãƒªã‚¢ãƒ«ç™»éŒ²
 	/// </summary>
-	void LoadMaterial(const string& DIRECTORY_PATH, const string& FILENAME);
-	
-	Material GetMaterial() { return material; }
+	void AddMaterial(Material* material);
 
-	ID3D12GraphicsCommandList* GetCommandList() { return cmdList; }
 	/// <summary>
-	/// ƒ‚ƒfƒ‹ì¬
+	/// ãƒ‡ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—ã®ç”Ÿæˆ
 	/// </summary>
-	void Initialize();
-	 
-	void Create(string modelName);
+	void CreateDescriptorHeap();
 
-	void Draw();
+	/// <summary>
+	/// ãƒ†ã‚¯ã‚¹ãƒãƒ£èª­ã¿è¾¼ã¿
+	/// </summary>
+	void LoadTextures();
 };

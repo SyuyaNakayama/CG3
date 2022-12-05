@@ -1,486 +1,395 @@
-#include "Model.h"
+ï»¿#include "Model.h"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
-#include <DirectXTex.h>
-#include <d3dcompiler.h>
 
-using namespace DirectX;
-using namespace Microsoft::WRL;
+using namespace std;
 
-ComPtr<ID3D12Resource> Model::vertBuff;
-ComPtr<ID3D12Resource> Model::indexBuff;
-D3D12_VERTEX_BUFFER_VIEW Model::vbView{};
-D3D12_INDEX_BUFFER_VIEW Model::ibView{};
-vector<Model::VertexPosNormalUv> Model::vertices;
-vector<unsigned short> Model::indices;
-Model::Material Model::material;
-ComPtr<ID3D12Resource> Model::texbuff;
-CD3DX12_CPU_DESCRIPTOR_HANDLE Model::cpuDescHandleSRV;
-CD3DX12_GPU_DESCRIPTOR_HANDLE Model::gpuDescHandleSRV;
-ComPtr<ID3D12DescriptorHeap> Model::descHeap;
-UINT Model::descriptorHandleIncrementSize = 0;
-ID3D12GraphicsCommandList* Model::cmdList = nullptr;
+/// <summary>
+/// é™çš„ãƒ¡ãƒ³ãƒå¤‰æ•°ã®å®Ÿä½“
+/// </summary>
+const std::string Model::baseDirectory = "Resources/";
 ID3D12Device* Model::device = nullptr;
-ComPtr<ID3D12PipelineState> Model::pipelinestate;
-ComPtr<ID3D12RootSignature> Model::rootsignature;
+UINT Model::descriptorHandleIncrementSize = 0;
 
-void Model::InitializeDescriptorHeap()
-{
-	HRESULT result = S_FALSE;
+void Model::StaticInitialize(ID3D12Device* device) {
+	Model::device = device;
 
-	// ƒfƒXƒNƒŠƒvƒ^ƒq[ƒv‚ğ¶¬	
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;//ƒVƒF[ƒ_‚©‚çŒ©‚¦‚é‚æ‚¤‚É
-	descHeapDesc.NumDescriptors = 1; // ƒVƒF[ƒ_[ƒŠƒ\[ƒXƒrƒ…[1‚Â
-	result = device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&descHeap));//¶¬
-	if (FAILED(result)) {
-		assert(0);
-	}
-
-	// ƒfƒXƒNƒŠƒvƒ^ƒTƒCƒY‚ğæ“¾
-	descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	// ãƒ¡ãƒƒã‚·ãƒ¥ã®é™çš„åˆæœŸåŒ–
+	Mesh::StaticInitialize(device);
 }
 
-void Model::LoadTexture(const string& DIRECTORY_PATH, const string& FILENAME)
-{
-	HRESULT result = S_FALSE;
+Model* Model::CreateFromOBJ(const std::string& modelname) {
+	// ãƒ¡ãƒ¢ãƒªç¢ºä¿
+	Model* instance = new Model;
+	instance->Initialize(modelname);
 
-	TexMetadata metadata{};
-	ScratchImage scratchImg{};
-
-	string filepath = DIRECTORY_PATH + FILENAME;
-
-	// ƒ†ƒjƒR[ƒh•¶š—ñ‚É•ÏŠ·‚·‚é
-	wchar_t wfilepath[128];
-	int iBufferSize = MultiByteToWideChar(CP_ACP, 0, filepath.c_str(), -1, wfilepath, _countof(wfilepath));
-
-	// WICƒeƒNƒXƒ`ƒƒ‚Ìƒ[ƒh
-	result = LoadFromWICFile(wfilepath, WIC_FLAGS_NONE, &metadata, scratchImg);
-	assert(SUCCEEDED(result));
-
-	ScratchImage mipChain{};
-	// ƒ~ƒbƒvƒ}ƒbƒv¶¬
-	result = GenerateMipMaps(
-		scratchImg.GetImages(), scratchImg.GetImageCount(), scratchImg.GetMetadata(),
-		TEX_FILTER_DEFAULT, 0, mipChain);
-	if (SUCCEEDED(result)) {
-		scratchImg = std::move(mipChain);
-		metadata = scratchImg.GetMetadata();
-	}
-
-	// “Ç‚İ‚ñ‚¾ƒfƒBƒtƒ…[ƒYƒeƒNƒXƒ`ƒƒ‚ğSRGB‚Æ‚µ‚Äˆµ‚¤
-	metadata.format = MakeSRGB(metadata.format);
-
-	// ƒŠƒ\[ƒXİ’è
-	CD3DX12_RESOURCE_DESC texresDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-		metadata.format, metadata.width, (UINT)metadata.height, (UINT16)metadata.arraySize,
-		(UINT16)metadata.mipLevels);
-
-	// ƒq[ƒvƒvƒƒpƒeƒB
-	CD3DX12_HEAP_PROPERTIES heapProps =
-		CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
-
-	// ƒeƒNƒXƒ`ƒƒ—pƒoƒbƒtƒ@‚Ì¶¬
-	result = device->CreateCommittedResource(
-		&heapProps, D3D12_HEAP_FLAG_NONE, &texresDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ, // ƒeƒNƒXƒ`ƒƒ—pw’è
-		nullptr, IID_PPV_ARGS(&texbuff));
-	assert(SUCCEEDED(result));
-
-	// ƒeƒNƒXƒ`ƒƒƒoƒbƒtƒ@‚Éƒf[ƒ^“]‘—
-	for (size_t i = 0; i < metadata.mipLevels; i++) {
-		const Image* img = scratchImg.GetImage(i, 0, 0); // ¶ƒf[ƒ^’Šo
-		result = texbuff->WriteToSubresource(
-			(UINT)i,
-			nullptr,              // ‘S—Ìˆæ‚ÖƒRƒs[
-			img->pixels,          // Œ³ƒf[ƒ^ƒAƒhƒŒƒX
-			(UINT)img->rowPitch,  // 1ƒ‰ƒCƒ“ƒTƒCƒY
-			(UINT)img->slicePitch // 1–‡ƒTƒCƒY
-		);
-		assert(SUCCEEDED(result));
-	}
-
-	// ƒVƒF[ƒ_ƒŠƒ\[ƒXƒrƒ…[ì¬
-	cpuDescHandleSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(descHeap->GetCPUDescriptorHandleForHeapStart(), 0, descriptorHandleIncrementSize);
-	gpuDescHandleSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(descHeap->GetGPUDescriptorHandleForHeapStart(), 0, descriptorHandleIncrementSize);
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{}; // İ’è\‘¢‘Ì
-	D3D12_RESOURCE_DESC resDesc = texbuff->GetDesc();
-
-	srvDesc.Format = resDesc.Format;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2DƒeƒNƒXƒ`ƒƒ
-	srvDesc.Texture2D.MipLevels = 1;
-
-	device->CreateShaderResourceView(texbuff.Get(), //ƒrƒ…[‚ÆŠÖ˜A•t‚¯‚éƒoƒbƒtƒ@
-		&srvDesc, //ƒeƒNƒXƒ`ƒƒİ’èî•ñ
-		cpuDescHandleSRV
-	);
-
+	return instance;
 }
 
-void LoadVector3Stream(istringstream& stream, XMFLOAT3& vec)
-{
-	stream >> vec.x;
-	stream >> vec.y;
-	stream >> vec.z;
+Model::~Model() {
+	for (auto m : meshes) {
+		delete m;
+	}
+	meshes.clear();
+
+	for (auto m : materials) {
+		delete m.second;
+	}
+	materials.clear();
 }
 
-void Model::LoadMaterial(const string& DIRECTORY_PATH, const string& FILENAME)
-{
-	ifstream file;
-	file.open(DIRECTORY_PATH + FILENAME);
+void Model::Initialize(const std::string& modelname) {
+	const string filename = modelname + ".obj";
+	const string directoryPath = baseDirectory + modelname + "/";
+
+	// ãƒ•ã‚¡ã‚¤ãƒ«ã‚¹ãƒˆãƒªãƒ¼ãƒ 
+	std::ifstream file;
+	// .objãƒ•ã‚¡ã‚¤ãƒ«ã‚’é–‹ã
+	file.open(directoryPath + filename);
+	// ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³å¤±æ•—ã‚’ãƒã‚§ãƒƒã‚¯
 	assert(!file.fail());
 
+	name = modelname;
+
+	// ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆ
+	Mesh* mesh = new Mesh;
+	int indexCountTex = 0;
+	int indexCountNoTex = 0;
+
+	vector<XMFLOAT3> positions; // é ‚ç‚¹åº§æ¨™
+	vector<XMFLOAT3> normals;   // æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«
+	vector<XMFLOAT2> texcoords; // ãƒ†ã‚¯ã‚¹ãƒãƒ£UV
+	// 1è¡Œãšã¤èª­ã¿è¾¼ã‚€
 	string line;
-	while (getline(file, line))
-	{
-		istringstream line_stream(line);
+	while (getline(file, line)) {
+
+		// 1è¡Œåˆ†ã®æ–‡å­—åˆ—ã‚’ã‚¹ãƒˆãƒªãƒ¼ãƒ ã«å¤‰æ›ã—ã¦è§£æã—ã‚„ã™ãã™ã‚‹
+		std::istringstream line_stream(line);
+
+		// åŠè§’ã‚¹ãƒšãƒ¼ã‚¹åŒºåˆ‡ã‚Šã§è¡Œã®å…ˆé ­æ–‡å­—åˆ—ã‚’å–å¾—
 		string key;
 		getline(line_stream, key, ' ');
 
-		if (key[0] == '\t') { key.erase(key.begin()); }
-
-		if (key == "newmtl") { line_stream >> material.name; }
-		if (key == "Ka") { LoadVector3Stream(line_stream, material.ambient); }
-		if (key == "Kd") { LoadVector3Stream(line_stream, material.diffuse); }
-		if (key == "Ks") { LoadVector3Stream(line_stream, material.specular); }
-		if (key == "map_Kd")
-		{
-			line_stream >> material.textureFilename;
-			LoadTexture(DIRECTORY_PATH, material.textureFilename);
-		}
-	}
-	file.close();
-}
-
-void Model::Initialize()
-{
-	InitializeDescriptorHeap();
-	InitializeGraphicsPipeline();
-}
-
-void Model::Create(string modelName)
-{
-	HRESULT result = S_FALSE;
-	ifstream file;
-	const string FILENAME = modelName + ".obj",
-		DIRECTORY_PATH = "Resources/" + modelName + "/";
-	file.open(DIRECTORY_PATH + FILENAME);
-	assert(!file.fail());
-
-	vector<XMFLOAT3> positions, normals;
-	vector<XMFLOAT2> texcoords;
-
-	string line;
-	while (getline(file, line))
-	{
-		istringstream line_stream(line);
-		string key;
-		getline(line_stream, key, ' ');
-
-		// ƒ}ƒeƒŠƒAƒ‹“Ç‚İ‚İ
-		if (key == "mtllib")
-		{
+		//ãƒãƒ†ãƒªã‚¢ãƒ«
+		if (key == "mtllib") {
+			// ãƒãƒ†ãƒªã‚¢ãƒ«ã®ãƒ•ã‚¡ã‚¤ãƒ«åèª­ã¿è¾¼ã¿
 			string filename;
 			line_stream >> filename;
-			LoadMaterial(DIRECTORY_PATH, filename);
+			// ãƒãƒ†ãƒªã‚¢ãƒ«èª­ã¿è¾¼ã¿
+			LoadMaterial(directoryPath, filename);
 		}
-		// ’¸“_À•W“Ç‚İ‚İ
-		if (key == "v")
-		{
+		// å…ˆé ­æ–‡å­—åˆ—ãŒgãªã‚‰ã‚°ãƒ«ãƒ¼ãƒ—ã®é–‹å§‹
+		if (key == "g") {
+
+			if (mesh->GetName().size() > 0) {
+				// ã‚³ãƒ³ãƒ†ãƒŠã«ç™»éŒ²
+				meshes.emplace_back(mesh);
+				// æ¬¡ã®ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆ
+				mesh = new Mesh;
+				indexCountTex = 0;
+			}
+
+			// ã‚°ãƒ«ãƒ¼ãƒ—åèª­ã¿è¾¼ã¿
+			string groupName;
+			line_stream >> groupName;
+
+			// ãƒ¡ãƒƒã‚·ãƒ¥ã«åå‰ã‚’ã‚»ãƒƒãƒˆ
+			mesh->SetName(groupName);
+		}
+		// å…ˆé ­æ–‡å­—åˆ—ãŒvãªã‚‰é ‚ç‚¹åº§æ¨™
+		if (key == "v") {
+			// X,Y,Zåº§æ¨™èª­ã¿è¾¼ã¿
 			XMFLOAT3 position{};
-			LoadVector3Stream(line_stream, position);
+			line_stream >> position.x;
+			line_stream >> position.y;
+			line_stream >> position.z;
 			positions.emplace_back(position);
 		}
-		// ƒeƒNƒXƒ`ƒƒÀ•W“Ç‚İ‚İ
-		if (key == "vt")
-		{
+		// å…ˆé ­æ–‡å­—åˆ—ãŒvtãªã‚‰ãƒ†ã‚¯ã‚¹ãƒãƒ£
+		if (key == "vt") {
+			// U,Væˆåˆ†èª­ã¿è¾¼ã¿
 			XMFLOAT2 texcoord{};
 			line_stream >> texcoord.x;
 			line_stream >> texcoord.y;
+			// Væ–¹å‘åè»¢
 			texcoord.y = 1.0f - texcoord.y;
+			// ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
 			texcoords.emplace_back(texcoord);
 		}
-		// –@üƒxƒNƒgƒ‹“Ç‚İ‚İ
-		if (key == "vn")
-		{
+		// å…ˆé ­æ–‡å­—åˆ—ãŒvnãªã‚‰æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«
+		if (key == "vn") {
+			// X,Y,Zæˆåˆ†èª­ã¿è¾¼ã¿
 			XMFLOAT3 normal{};
-			LoadVector3Stream(line_stream, normal);
+			line_stream >> normal.x;
+			line_stream >> normal.y;
+			line_stream >> normal.z;
+			// æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
 			normals.emplace_back(normal);
 		}
-		// ƒ|ƒŠƒSƒ“ƒf[ƒ^“Ç‚İ‚İ
-		if (key == "f")
-		{
-			string index_string;
-			while (getline(line_stream, index_string, ' '))
-			{
-				istringstream index_stream(index_string);
-				unsigned short indexPosition, indexNormal, indexTexcoord;
-				index_stream >> indexPosition;
-				index_stream.seekg(1, ios_base::cur); // ƒXƒ‰ƒbƒVƒ…‚ğ”ò‚Î‚·
-				index_stream >> indexTexcoord;
-				index_stream.seekg(1, ios_base::cur);
-				index_stream >> indexNormal;
+		// å…ˆé ­æ–‡å­—åˆ—ãŒusemtlãªã‚‰ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å‰²ã‚Šå½“ã¦ã‚‹
+		if (key == "usemtl") {
+			if (mesh->GetMaterial() == nullptr) {
+				// ãƒãƒ†ãƒªã‚¢ãƒ«ã®åèª­ã¿è¾¼ã¿
+				string materialName;
+				line_stream >> materialName;
 
-				VertexPosNormalUv vertex{};
-				vertex.pos = positions[indexPosition - 1];
-				vertex.normal = normals[indexNormal - 1];
-				vertex.uv = texcoords[indexTexcoord - 1];
-				vertices.emplace_back(vertex);
-				indices.emplace_back(indices.size());
+				// ãƒãƒ†ãƒªã‚¢ãƒ«åã§æ¤œç´¢ã—ã€ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å‰²ã‚Šå½“ã¦ã‚‹
+				auto itr = materials.find(materialName);
+				if (itr != materials.end()) {
+					mesh->SetMaterial(itr->second);
+				}
+			}
+		}
+		// å…ˆé ­æ–‡å­—åˆ—ãŒfãªã‚‰ãƒãƒªã‚´ãƒ³ï¼ˆä¸‰è§’å½¢ï¼‰
+		if (key == "f") {
+			int faceIndexCount = 0;
+			// åŠè§’ã‚¹ãƒšãƒ¼ã‚¹åŒºåˆ‡ã‚Šã§è¡Œã®ç¶šãã‚’èª­ã¿è¾¼ã‚€
+			string index_string;
+			while (getline(line_stream, index_string, ' ')) {
+				// é ‚ç‚¹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹1å€‹åˆ†ã®æ–‡å­—åˆ—ã‚’ã‚¹ãƒˆãƒªãƒ¼ãƒ ã«å¤‰æ›ã—ã¦è§£æã—ã‚„ã™ãã™ã‚‹
+				std::istringstream index_stream(index_string);
+				unsigned short indexPosition, indexNormal, indexTexcoord;
+				// é ‚ç‚¹ç•ªå·
+				index_stream >> indexPosition;
+
+				Material* material = mesh->GetMaterial();
+				index_stream.seekg(1, ios_base::cur); // ã‚¹ãƒ©ãƒƒã‚·ãƒ¥ã‚’é£›ã°ã™
+				// ãƒãƒ†ãƒªã‚¢ãƒ«ã€ãƒ†ã‚¯ã‚¹ãƒãƒ£ãŒã‚ã‚‹å ´åˆ
+				if (material && material->textureFilename.size() > 0) {
+					index_stream >> indexTexcoord;
+					index_stream.seekg(1, ios_base::cur); // ã‚¹ãƒ©ãƒƒã‚·ãƒ¥ã‚’é£›ã°ã™
+					index_stream >> indexNormal;
+					// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®è¿½åŠ 
+					Mesh::VertexPosNormalUv vertex{};
+					vertex.pos = positions[indexPosition - 1];
+					vertex.normal = normals[indexNormal - 1];
+					vertex.uv = texcoords[indexTexcoord - 1];
+					mesh->AddVertex(vertex);
+				} else {
+					char c;
+					index_stream >> c;
+					// ã‚¹ãƒ©ãƒƒã‚·ãƒ¥2é€£ç¶šã®å ´åˆã€é ‚ç‚¹ç•ªå·ã®ã¿
+					if (c == '/') {
+						// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®è¿½åŠ 
+						Mesh::VertexPosNormalUv vertex{};
+						vertex.pos = positions[indexPosition - 1];
+						vertex.normal = {0, 0, 1};
+						vertex.uv = {0, 0};
+						mesh->AddVertex(vertex);
+					} else {
+						index_stream.seekg(-1, ios_base::cur); // 1æ–‡å­—æˆ»ã‚‹
+						index_stream >> indexTexcoord;
+						index_stream.seekg(1, ios_base::cur); // ã‚¹ãƒ©ãƒƒã‚·ãƒ¥ã‚’é£›ã°ã™
+						index_stream >> indexNormal;
+						// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®è¿½åŠ 
+						Mesh::VertexPosNormalUv vertex{};
+						vertex.pos = positions[indexPosition - 1];
+						vertex.normal = normals[indexNormal - 1];
+						vertex.uv = {0, 0};
+						mesh->AddVertex(vertex);
+					}
+				}
+				// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ã®è¿½åŠ 
+				if (faceIndexCount >= 3) {
+					// å››è§’å½¢ãƒãƒªã‚´ãƒ³ã®4ç‚¹ç›®ãªã®ã§ã€
+					// å››è§’å½¢ã®0,1,2,3ã®å†… 2,3,0ã§ä¸‰è§’å½¢ã‚’æ§‹ç¯‰ã™ã‚‹
+					mesh->AddIndex(indexCountTex - 1);
+					mesh->AddIndex(indexCountTex);
+					mesh->AddIndex(indexCountTex - 3);
+				} else {
+					mesh->AddIndex(indexCountTex);
+				}
+				indexCountTex++;
+				faceIndexCount++;
 			}
 		}
 	}
 	file.close();
 
-	std::vector<VertexPosNormalUv> realVertices;
+	// ã‚³ãƒ³ãƒ†ãƒŠã«ç™»éŒ²
+	meshes.emplace_back(mesh);
 
-	UINT sizeVB = static_cast<UINT>(sizeof(VertexPosNormalUv) * vertices.size());
-
-	// ƒq[ƒvƒvƒƒpƒeƒB
-	CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	// ƒŠƒ\[ƒXİ’è
-	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeVB);
-
-	// ’¸“_ƒoƒbƒtƒ@¶¬
-	result = device->CreateCommittedResource(
-		&heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-		IID_PPV_ARGS(&vertBuff));
-	assert(SUCCEEDED(result));
-
-	// ’¸“_ƒoƒbƒtƒ@‚Ö‚Ìƒf[ƒ^“]‘—
-	VertexPosNormalUv* vertMap = nullptr;
-	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
-	if (SUCCEEDED(result)) {
-		copy(vertices.begin(), vertices.end(), vertMap);
-		vertBuff->Unmap(0, nullptr);
+	// ãƒ¡ãƒƒã‚·ãƒ¥ã®ãƒãƒ†ãƒªã‚¢ãƒ«ãƒã‚§ãƒƒã‚¯
+	for (auto& m : meshes) {
+		// ãƒãƒ†ãƒªã‚¢ãƒ«ã®å‰²ã‚Šå½“ã¦ãŒãªã„
+		if (m->GetMaterial() == nullptr) {
+			if (defaultMaterial == nullptr) {
+				// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆãƒãƒ†ãƒªã‚¢ãƒ«ã‚’ç”Ÿæˆ
+				defaultMaterial = Material::Create();
+				defaultMaterial->name = "no material";
+				materials.emplace(defaultMaterial->name, defaultMaterial);
+			}
+			// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆãƒãƒ†ãƒªã‚¢ãƒ«ã‚’ã‚»ãƒƒãƒˆ
+			m->SetMaterial(defaultMaterial);
+		}
 	}
 
-	// ’¸“_ƒoƒbƒtƒ@ƒrƒ…[‚Ìì¬
-	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
-	vbView.SizeInBytes = sizeVB;
-	vbView.StrideInBytes = sizeof(vertices[0]);
-
-	UINT sizeIB = static_cast<UINT>(sizeof(unsigned short) * indices.size());
-	// ƒŠƒ\[ƒXİ’è
-	resourceDesc.Width = sizeIB;
-
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@¶¬
-	result = device->CreateCommittedResource(
-		&heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-		IID_PPV_ARGS(&indexBuff));
-
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚Ö‚Ìƒf[ƒ^“]‘—
-	unsigned short* indexMap = nullptr;
-	result = indexBuff->Map(0, nullptr, (void**)&indexMap);
-	if (SUCCEEDED(result)) {
-
-		// ‘SƒCƒ“ƒfƒbƒNƒX‚É‘Î‚µ‚Ä
-		copy(indices.begin(), indices.end(), indexMap);	// ƒCƒ“ƒfƒbƒNƒX‚ğƒRƒs[
-
-		indexBuff->Unmap(0, nullptr);
+	// ãƒ¡ãƒƒã‚·ãƒ¥ã®ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
+	for (auto& m : meshes) {
+		m->CreateBuffers();
 	}
 
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@ƒrƒ…[‚Ìì¬
-	ibView.BufferLocation = indexBuff->GetGPUVirtualAddress();
-	ibView.Format = DXGI_FORMAT_R16_UINT;
-	ibView.SizeInBytes = sizeIB;
+	// ãƒãƒ†ãƒªã‚¢ãƒ«ã®æ•°å€¤ã‚’å®šæ•°ãƒãƒƒãƒ•ã‚¡ã«åæ˜ 
+	for (auto& m : materials) {
+		m.second->Update();
+	}
+
+	// ãƒ‡ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—ç”Ÿæˆ
+	CreateDescriptorHeap();
+
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®èª­ã¿è¾¼ã¿
+	LoadTextures();
 }
 
-void Model::InitializeGraphicsPipeline()
-{
+void Model::LoadMaterial(const std::string& directoryPath, const std::string& filename) {
+	// ãƒ•ã‚¡ã‚¤ãƒ«ã‚¹ãƒˆãƒªãƒ¼ãƒ 
+	std::ifstream file;
+	// ãƒãƒ†ãƒªã‚¢ãƒ«ãƒ•ã‚¡ã‚¤ãƒ«ã‚’é–‹ã
+	file.open(directoryPath + filename);
+	// ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³å¤±æ•—ã‚’ãƒã‚§ãƒƒã‚¯
+	assert(!file.fail());
+
+	Material* material = nullptr;
+
+	// 1è¡Œãšã¤èª­ã¿è¾¼ã‚€
+	string line;
+	while (getline(file, line)) {
+
+		// 1è¡Œåˆ†ã®æ–‡å­—åˆ—ã‚’ã‚¹ãƒˆãƒªãƒ¼ãƒ ã«å¤‰æ›ã—ã¦è§£æã—ã‚„ã™ãã™ã‚‹
+		std::istringstream line_stream(line);
+
+		// åŠè§’ã‚¹ãƒšãƒ¼ã‚¹åŒºåˆ‡ã‚Šã§è¡Œã®å…ˆé ­æ–‡å­—åˆ—ã‚’å–å¾—
+		string key;
+		getline(line_stream, key, ' ');
+
+		// å…ˆé ­ã®ã‚¿ãƒ–æ–‡å­—ã¯ç„¡è¦–ã™ã‚‹
+		if (key[0] == '\t') {
+			key.erase(key.begin()); // å…ˆé ­ã®æ–‡å­—ã‚’å‰Šé™¤
+		}
+
+		// å…ˆé ­æ–‡å­—åˆ—ãŒnewmtlãªã‚‰ãƒãƒ†ãƒªã‚¢ãƒ«å
+		if (key == "newmtl") {
+
+			// æ—¢ã«ãƒãƒ†ãƒªã‚¢ãƒ«ãŒã‚ã‚Œã°
+			if (material) {
+				// ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’ã‚³ãƒ³ãƒ†ãƒŠã«ç™»éŒ²
+				AddMaterial(material);
+			}
+
+			// æ–°ã—ã„ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’ç”Ÿæˆ
+			material = Material::Create();
+			// ãƒãƒ†ãƒªã‚¢ãƒ«åèª­ã¿è¾¼ã¿
+			line_stream >> material->name;
+		}
+		// å…ˆé ­æ–‡å­—åˆ—ãŒKaãªã‚‰ã‚¢ãƒ³ãƒ“ã‚¨ãƒ³ãƒˆè‰²
+		if (key == "Ka") {
+			line_stream >> material->ambient.x;
+			line_stream >> material->ambient.y;
+			line_stream >> material->ambient.z;
+		}
+		// å…ˆé ­æ–‡å­—åˆ—ãŒKdãªã‚‰ãƒ‡ã‚£ãƒ•ãƒ¥ãƒ¼ã‚ºè‰²
+		if (key == "Kd") {
+			line_stream >> material->diffuse.x;
+			line_stream >> material->diffuse.y;
+			line_stream >> material->diffuse.z;
+		}
+		// å…ˆé ­æ–‡å­—åˆ—ãŒKsãªã‚‰ã‚¹ãƒšã‚­ãƒ¥ãƒ©ãƒ¼è‰²
+		if (key == "Ks") {
+			line_stream >> material->specular.x;
+			line_stream >> material->specular.y;
+			line_stream >> material->specular.z;
+		}
+		// å…ˆé ­æ–‡å­—åˆ—ãŒmap_Kdãªã‚‰ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ•ã‚¡ã‚¤ãƒ«å
+		if (key == "map_Kd") {
+			// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ãƒ•ã‚¡ã‚¤ãƒ«åèª­ã¿è¾¼ã¿
+			line_stream >> material->textureFilename;
+
+			// ãƒ•ãƒ«ãƒ‘ã‚¹ã‹ã‚‰ãƒ•ã‚¡ã‚¤ãƒ«åã‚’å–ã‚Šå‡ºã™
+			size_t pos1;
+			pos1 = material->textureFilename.rfind('\\');
+			if (pos1 != string::npos) {
+				material->textureFilename = material->textureFilename.substr(
+				  pos1 + 1, material->textureFilename.size() - pos1 - 1);
+			}
+
+			pos1 = material->textureFilename.rfind('/');
+			if (pos1 != string::npos) {
+				material->textureFilename = material->textureFilename.substr(
+				  pos1 + 1, material->textureFilename.size() - pos1 - 1);
+			}
+		}
+	}
+	// ãƒ•ã‚¡ã‚¤ãƒ«ã‚’é–‰ã˜ã‚‹
+	file.close();
+
+	if (material) {
+		// ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’ç™»éŒ²
+		AddMaterial(material);
+	}
+}
+
+void Model::AddMaterial(Material* material) {
+	// ã‚³ãƒ³ãƒ†ãƒŠã«ç™»éŒ²
+	materials.emplace(material->name, material);
+}
+
+void Model::CreateDescriptorHeap() {
 	HRESULT result = S_FALSE;
-	ComPtr<ID3DBlob> vsBlob; // ’¸“_ƒVƒF[ƒ_ƒIƒuƒWƒFƒNƒg
-	ComPtr<ID3DBlob> psBlob;	// ƒsƒNƒZƒ‹ƒVƒF[ƒ_ƒIƒuƒWƒFƒNƒg
-	ComPtr<ID3DBlob> errorBlob; // ƒGƒ‰[ƒIƒuƒWƒFƒNƒg
 
-	// ’¸“_ƒVƒF[ƒ_‚Ì“Ç‚İ‚İ‚ÆƒRƒ“ƒpƒCƒ‹
-	result = D3DCompileFromFile(
-		L"Resources/Shaders/OBJVertexShader.hlsl",	// ƒVƒF[ƒ_ƒtƒ@ƒCƒ‹–¼
-		nullptr,
-		D3D_COMPILE_STANDARD_FILE_INCLUDE, // ƒCƒ“ƒNƒ‹[ƒh‰Â”\‚É‚·‚é
-		"main", "vs_5_0",	// ƒGƒ“ƒgƒŠ[ƒ|ƒCƒ“ƒg–¼AƒVƒF[ƒ_[ƒ‚ƒfƒ‹w’è
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, // ƒfƒoƒbƒO—pİ’è
-		0,
-		&vsBlob, &errorBlob);
-	if (FAILED(result)) {
-		// errorBlob‚©‚çƒGƒ‰[“à—e‚ğstringŒ^‚ÉƒRƒs[
-		std::string errstr;
-		errstr.resize(errorBlob->GetBufferSize());
+	// ãƒãƒ†ãƒªã‚¢ãƒ«ã®æ•°
+	size_t count = materials.size();
 
-		std::copy_n((char*)errorBlob->GetBufferPointer(),
-			errorBlob->GetBufferSize(),
-			errstr.begin());
-		errstr += "\n";
-		// ƒGƒ‰[“à—e‚ğo—ÍƒEƒBƒ“ƒhƒE‚É•\¦
-		OutputDebugStringA(errstr.c_str());
-		exit(1);
+	// ãƒ‡ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—ã‚’ç”Ÿæˆ
+	if (count > 0) {
+		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+		descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE; //ã‚·ã‚§ãƒ¼ãƒ€ã‹ã‚‰è¦‹ãˆã‚‹ã‚ˆã†ã«
+		descHeapDesc.NumDescriptors = (UINT)count; // ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒªã‚½ãƒ¼ã‚¹ãƒ“ãƒ¥ãƒ¼ã®æ•°
+		result = device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&descHeap)); //ç”Ÿæˆ
+		assert(SUCCEEDED(result));
 	}
 
-	// ƒsƒNƒZƒ‹ƒVƒF[ƒ_‚Ì“Ç‚İ‚İ‚ÆƒRƒ“ƒpƒCƒ‹
-	result = D3DCompileFromFile(
-		L"Resources/Shaders/OBJPixelShader.hlsl",	// ƒVƒF[ƒ_ƒtƒ@ƒCƒ‹–¼
-		nullptr,
-		D3D_COMPILE_STANDARD_FILE_INCLUDE, // ƒCƒ“ƒNƒ‹[ƒh‰Â”\‚É‚·‚é
-		"main", "ps_5_0",	// ƒGƒ“ƒgƒŠ[ƒ|ƒCƒ“ƒg–¼AƒVƒF[ƒ_[ƒ‚ƒfƒ‹w’è
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, // ƒfƒoƒbƒO—pİ’è
-		0,
-		&psBlob, &errorBlob);
-	if (FAILED(result)) {
-		// errorBlob‚©‚çƒGƒ‰[“à—e‚ğstringŒ^‚ÉƒRƒs[
-		std::string errstr;
-		errstr.resize(errorBlob->GetBufferSize());
+	// ãƒ‡ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã‚µã‚¤ã‚ºã‚’å–å¾—
+	descriptorHandleIncrementSize =
+	  device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+}
 
-		std::copy_n((char*)errorBlob->GetBufferPointer(),
-			errorBlob->GetBufferSize(),
-			errstr.begin());
-		errstr += "\n";
-		// ƒGƒ‰[“à—e‚ğo—ÍƒEƒBƒ“ƒhƒE‚É•\¦
-		OutputDebugStringA(errstr.c_str());
-		exit(1);
+void Model::LoadTextures() {
+	int textureIndex = 0;
+	string directoryPath = baseDirectory + name + "/";
+
+	for (auto& m : materials) {
+		Material* material = m.second;
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuDescHandleSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(
+		  descHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex,
+		  descriptorHandleIncrementSize);
+		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuDescHandleSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(
+		  descHeap->GetGPUDescriptorHandleForHeapStart(), textureIndex,
+		  descriptorHandleIncrementSize);
+
+		// ãƒ†ã‚¯ã‚¹ãƒãƒ£ãªã—
+		if (material->textureFilename.size() <= 0) {
+			directoryPath = baseDirectory;
+		}
+
+		// ãƒ†ã‚¯ã‚¹ãƒãƒ£èª­ã¿è¾¼ã¿
+		material->LoadTexture(directoryPath, cpuDescHandleSRV, gpuDescHandleSRV);
+
+		textureIndex++;
+	}
+}
+
+void Model::Draw(ID3D12GraphicsCommandList* cmdList) {
+	// ãƒ‡ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—ã®é…åˆ—
+	if (descHeap) {
+		ID3D12DescriptorHeap* ppHeaps[] = {descHeap.Get()};
+		cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 	}
 
-	// ’¸“_ƒŒƒCƒAƒEƒg
-	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-		{ // xyÀ•W(1s‚Å‘‚¢‚½‚Ù‚¤‚ªŒ©‚â‚·‚¢)
-			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{ // –@üƒxƒNƒgƒ‹(1s‚Å‘‚¢‚½‚Ù‚¤‚ªŒ©‚â‚·‚¢)
-			"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{ // uvÀ•W(1s‚Å‘‚¢‚½‚Ù‚¤‚ªŒ©‚â‚·‚¢)
-			"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-	};
-
-	// ƒOƒ‰ƒtƒBƒbƒNƒXƒpƒCƒvƒ‰ƒCƒ“‚Ì—¬‚ê‚ğİ’è
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpipeline{};
-	gpipeline.VS = CD3DX12_SHADER_BYTECODE(vsBlob.Get());
-	gpipeline.PS = CD3DX12_SHADER_BYTECODE(psBlob.Get());
-
-	// ƒTƒ“ƒvƒ‹ƒ}ƒXƒN
-	gpipeline.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; // •W€İ’è
-	// ƒ‰ƒXƒ^ƒ‰ƒCƒUƒXƒe[ƒg
-	gpipeline.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	//gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	//gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	// ƒfƒvƒXƒXƒeƒ“ƒVƒ‹ƒXƒe[ƒg
-	gpipeline.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-
-	// ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚ÌƒuƒŒƒ“ƒhİ’è
-	D3D12_RENDER_TARGET_BLEND_DESC blenddesc{};
-	blenddesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;	// RBGA‘S‚Ä‚Ìƒ`ƒƒƒ“ƒlƒ‹‚ğ•`‰æ
-	blenddesc.BlendEnable = true;
-	blenddesc.BlendOp = D3D12_BLEND_OP_ADD;
-	blenddesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	blenddesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-
-	blenddesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	blenddesc.SrcBlendAlpha = D3D12_BLEND_ONE;
-	blenddesc.DestBlendAlpha = D3D12_BLEND_ZERO;
-
-	// ƒuƒŒƒ“ƒhƒXƒe[ƒg‚Ìİ’è
-	gpipeline.BlendState.RenderTarget[0] = blenddesc;
-
-	// [“xƒoƒbƒtƒ@‚ÌƒtƒH[ƒ}ƒbƒg
-	gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-
-	// ’¸“_ƒŒƒCƒAƒEƒg‚Ìİ’è
-	gpipeline.InputLayout.pInputElementDescs = inputLayout;
-	gpipeline.InputLayout.NumElements = _countof(inputLayout);
-
-	// }Œ`‚ÌŒ`óİ’èiOŠpŒ`j
-	gpipeline.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-
-	gpipeline.NumRenderTargets = 1;	// •`‰æ‘ÎÛ‚Í1‚Â
-	gpipeline.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // 0`255w’è‚ÌRGBA
-	gpipeline.SampleDesc.Count = 1; // 1ƒsƒNƒZƒ‹‚É‚Â‚«1‰ñƒTƒ“ƒvƒŠƒ“ƒO
-
-	// ƒfƒXƒNƒŠƒvƒ^ƒŒƒ“ƒW
-	CD3DX12_DESCRIPTOR_RANGE descRangeSRV;
-	descRangeSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0 ƒŒƒWƒXƒ^
-
-	// ƒ‹[ƒgƒpƒ‰ƒ[ƒ^
-	CD3DX12_ROOT_PARAMETER rootparams[3];
-	rootparams[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
-	rootparams[1].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL);
-	rootparams[2].InitAsDescriptorTable(1, &descRangeSRV, D3D12_SHADER_VISIBILITY_ALL);
-
-	// ƒXƒ^ƒeƒBƒbƒNƒTƒ“ƒvƒ‰[
-	CD3DX12_STATIC_SAMPLER_DESC samplerDesc = CD3DX12_STATIC_SAMPLER_DESC(0);
-
-	// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚Ìİ’è
-	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-	rootSignatureDesc.Init_1_0(_countof(rootparams), rootparams, 1, &samplerDesc, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-	ComPtr<ID3DBlob> rootSigBlob;
-	// ƒo[ƒWƒ‡ƒ“©“®”»’è‚ÌƒVƒŠƒAƒ‰ƒCƒY
-	result = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_0, &rootSigBlob, &errorBlob);
-	// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚Ì¶¬
-	result = device->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(&rootsignature));
-	assert(SUCCEEDED(result));
-
-	gpipeline.pRootSignature = rootsignature.Get();
-
-	// ƒOƒ‰ƒtƒBƒbƒNƒXƒpƒCƒvƒ‰ƒCƒ“‚Ì¶¬
-	result = device->CreateGraphicsPipelineState(&gpipeline, IID_PPV_ARGS(&pipelinestate));
-	assert(SUCCEEDED(result));
-
-}
-
-void Model::StaticInitialize(ID3D12Device* device)
-{
-	assert(device);
-	Model::device = device;
-}
-
-void Model::PreDraw(ID3D12GraphicsCommandList* cmdList)
-{
-	// PreDraw‚ÆPostDraw‚ªƒyƒA‚ÅŒÄ‚Î‚ê‚Ä‚¢‚È‚¯‚ê‚ÎƒGƒ‰[
-	assert(Model::cmdList == nullptr);
-
-	// ƒRƒ}ƒ“ƒhƒŠƒXƒg‚ğƒZƒbƒg
-	Model::cmdList = cmdList;
-
-	// ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚Ìİ’è
-	cmdList->SetPipelineState(pipelinestate.Get());
-	// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚Ìİ’è
-	cmdList->SetGraphicsRootSignature(rootsignature.Get());
-	// ƒvƒŠƒ~ƒeƒBƒuŒ`ó‚ğİ’è
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-}
-
-void Model::PostDraw()
-{
-	// ƒRƒ}ƒ“ƒhƒŠƒXƒg‚ğ‰ğœ
-	Model::cmdList = nullptr;
-}
-
-void Model::Draw()
-{
-	// nullptrƒ`ƒFƒbƒN
-	assert(device);
-	assert(Model::cmdList);
-
-	// ’¸“_ƒoƒbƒtƒ@‚Ìİ’è
-	cmdList->IASetVertexBuffers(0, 1, &vbView);
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚Ìİ’è
-	cmdList->IASetIndexBuffer(&ibView);
-
-	// ƒfƒXƒNƒŠƒvƒ^ƒq[ƒv‚Ì”z—ñ
-	ID3D12DescriptorHeap* ppHeaps[] = { descHeap.Get() };
-	cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
-	// ƒVƒF[ƒ_ƒŠƒ\[ƒXƒrƒ…[‚ğƒZƒbƒg
-	cmdList->SetGraphicsRootDescriptorTable(2, gpuDescHandleSRV);
-	// •`‰æƒRƒ}ƒ“ƒh
-	cmdList->DrawIndexedInstanced((UINT)indices.size(), 1, 0, 0, 0);
+	// å…¨ãƒ¡ãƒƒã‚·ãƒ¥ã‚’æç”»
+	for (auto& mesh : meshes) {
+		mesh->Draw(cmdList);
+	}
 }
